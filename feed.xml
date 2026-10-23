@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="ko">
+  <title>이시로스튜디오 소식</title>
+  <subtitle>아기토끼 시로가 만드는 앱·게임 소식</subtitle>
+  <link href="https://shiroleestudio.github.io/news/"/>
+  <link rel="self" href="https://shiroleestudio.github.io/feed.xml"/>
+  <id>https://shiroleestudio.github.io/</id>
+  <updated>2026-10-23T00:00:00+09:00</updated>
+  <author><name>이시로스튜디오</name><email>shiroleestudio@gmail.com</email></author>
+  <entry>
+    <title>허브 사이트 문을 열었어요</title>
+    <link href="https://shiroleestudio.github.io/"/>
+    <id>https://shiroleestudio.github.io/news/#2026-10-23-0</id>
+    <updated>2026-10-23T00:00:00+09:00</updated>
+    <summary>시로가 만드는 앱·게임·영상을 한곳에서 볼 수 있는 입구를 열었습니다. 작품별 소개, 개인정보처리방침, 문의 창구를 여기 모아 둡니다.</summary>
+  </entry>
+  <entry>
+    <title>거의 모든 것의 타임라인 v0.1.2</title>
+    <link href="https://shiroleestudio.github.io/works/timeline/"/>
+    <id>https://shiroleestudio.github.io/news/#2026-10-23-1</id>
+    <updated>2026-10-23T00:00:00+09:00</updated>
+    <summary>폰 첫 화면에 한국·중국·일본 세 줄이 한 번에 보이고, 펼친 항목을 바로 공유할 수 있게 됐어요. 출처를 확인한 항목 수도 함께 보여 줍니다.</summary>
+  </entry>
+  <entry>
+    <title>거의 모든 것의 타임라인 첫 공개(베타)</title>
+    <link href="https://shiroleestudio.github.io/works/timeline/"/>
+    <id>https://shiroleestudio.github.io/news/#2026-10-22-2</id>
+    <updated>2026-10-22T00:00:00+09:00</updated>
+    <summary>450여 개 항목을 한 시간축에 올린 역사 연표를 공개했습니다. 홈 화면에 추가하면 오프라인에서도 열려요.</summary>
+  </entry>
+  <entry>
+    <title>새 게임 이름은 ‘스페이스서퍼 달토끼’</title>
+    <link href="https://shiroleestudio.github.io/works/space-surfer/"/>
+    <id>https://shiroleestudio.github.io/news/#2026-10-13-3</id>
+    <updated>2026-10-13T00:00:00+09:00</updated>
+    <summary>당근 로켓을 탄 달토끼가 행성 중력을 타고 나는 한 손가락 퍼즐의 이름을 정했어요. 무료 웹판부터 공개할 준비를 하고 있습니다.</summary>
+  </entry>
+</feed>
