@@ -127,3 +127,29 @@ img{max-width:100%;height:auto;display:block}
 .lab h2{font-size:14px;letter-spacing:.2em;font-family:system-ui,sans-serif;font-weight:600;color:var(--ink-2);margin:0 0 6px;text-transform:uppercase}
 .lab>p{margin:0 0 12px;font-size:14px;color:var(--ink-2)}
 .lab .item{border-bottom:1px solid var(--rule)}
+
+/* 만드는 것: 플랫폼 */
+.pfilter{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 18px}
+.pfilter button{font:inherit;font-size:13px;letter-spacing:.04em;background:transparent;color:var(--ink-2);border:1px solid var(--rule);border-radius:2px;padding:5px 12px;cursor:pointer}
+.pfilter button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.pfilter button:focus-visible{outline:2px solid var(--mustard);outline-offset:2px}
+.works{border-bottom:1px solid var(--rule)}
+.work{border-top:1px solid var(--rule);padding:18px 0}
+.work h2{border:0;padding:0;margin:0;font-size:20px}
+.work h2 a{text-decoration:none}.work h2 a:hover{text-decoration:underline}
+.work .tag{font-family:system-ui,sans-serif;font-size:12px;letter-spacing:.08em;color:var(--mustard);margin:2px 0 6px}
+.work>p{margin:0 0 8px;color:var(--ink-2);font-size:15px}
+.work.is-lab h2::after{content:"실험실";font-family:system-ui,sans-serif;font-size:11px;letter-spacing:.1em;color:var(--ink-2);border:1px solid var(--rule);padding:1px 6px;margin-left:8px;vertical-align:3px}
+.plats{list-style:none;margin:6px 0 4px;padding:0;display:grid;gap:4px}
+.plats li{font-size:14px;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;padding:3px 0;border-bottom:1px dotted var(--rule)}
+.plats li:last-child{border-bottom:0}
+.plats b{font-family:system-ui,sans-serif;font-size:12px;letter-spacing:.08em;min-width:64px;font-weight:600}
+.plats .pst{font-size:13px;color:var(--ink-2)}
+.plats .pst.on{color:var(--green)}
+.plats .pnote{font-size:12px;color:var(--ink-2)}
+.plats li.dim{opacity:.35}
+.wlinks{font-size:13px;margin:6px 0 0}
+.pempty{color:var(--ink-2)}
+.foot-note{font-size:13px;color:var(--ink-2);margin-top:16px}
+.item .plat{font-family:system-ui,sans-serif;font-size:12px;color:var(--ink-2);letter-spacing:.04em}
+[hidden]{display:none!important}

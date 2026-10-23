@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>만드는 것 — 이시로스튜디오</title>
-  <meta name="description" content="이시로스튜디오가 만든 무료 앱과 게임: 거의 모든 것의 타임라인, 스페이스서퍼 달토끼, 그리고 준비 중인 커피 레시피·출석부.">
+  <meta name="description" content="이시로스튜디오가 만든 무료 앱·게임·영상을 웹, 안드로이드, iOS, PC, 영상 플랫폼별로 골라 보세요. 거의 모든 것의 타임라인, 스페이스서퍼 달토끼, 시로의 커피 레시피, 메모함.">
   <link rel="canonical" href="https://shiroleestudio.github.io/works/">
   <meta name="theme-color" content="#e2dbc8">
   <meta property="og:site_name" content="이시로스튜디오">
   <meta property="og:locale" content="ko_KR">
   <meta property="og:type" content="website">
   <meta property="og:title" content="만드는 것 — 이시로스튜디오">
-  <meta property="og:description" content="이시로스튜디오가 만든 무료 앱과 게임: 거의 모든 것의 타임라인, 스페이스서퍼 달토끼, 그리고 준비 중인 커피 레시피·출석부.">
+  <meta property="og:description" content="이시로스튜디오가 만든 무료 앱·게임·영상을 웹, 안드로이드, iOS, PC, 영상 플랫폼별로 골라 보세요. 거의 모든 것의 타임라인, 스페이스서퍼 달토끼, 시로의 커피 레시피, 메모함.">
   <meta property="og:url" content="https://shiroleestudio.github.io/works/">
   <meta property="og:image" content="https://shiroleestudio.github.io/assets/og.png">
   <meta name="twitter:card" content="summary_large_image">
@@ -32,25 +32,62 @@
   <p class="crumbs"><a href="../">처음</a> / 만드는 것</p>
   <h1>만드는 것</h1>
   <p class="updated">모두 무료 · 회원가입 없음 · 기기 안에 저장</p>
-  <div class="cards">
-    <a class="wcard" href="../works/timeline/"><img src="../assets/img/timeline-phone.jpg" width="390" height="780" alt="" loading="lazy"><span class="st on">공개</span><h2>거의 모든 것의 타임라인</h2><p>한·중·일과 세계 역사를 한 시간축에. 웹앱(PWA).</p></a>
-    <a class="wcard" href="../works/space-surfer/"><img src="../assets/img/spacesurfer-orbit.png" width="393" height="852" alt="" loading="lazy" class="pixel"><span class="st">개발 중 · 미리 해보기</span><h2>스페이스서퍼 달토끼</h2><p>한 손가락 우주 중력 퍼즐. 개발자 버전을 미리 해볼 수 있어요.</p></a>
+  <div class="pfilter" role="group" aria-label="플랫폼으로 골라 보기" hidden>
+    <button type="button" data-f="all" aria-pressed="true">전체</button><button type="button" data-f="web" aria-pressed="false">웹</button><button type="button" data-f="android" aria-pressed="false">안드로이드</button><button type="button" data-f="ios" aria-pressed="false">iOS</button><button type="button" data-f="pc" aria-pressed="false">PC</button><button type="button" data-f="video" aria-pressed="false">영상</button>
   </div>
-  <h2>바로 쓰는 도구</h2>
-  <ul>
-    <li><b><a href="https://shiroleestudio.github.io/coffee/" rel="noopener">시로의 커피 레시피</a></b> — 추출 레시피와 타이머, 타이머 위에서 커피를 내리는 시로. 기기 안에 저장되는 웹앱. <a href="../privacy/coffee/">개인정보처리방침</a></li>
-  </ul>
-  <h2>만들고 있는 것</h2>
-  <ul>
-    <li><b>시로 도장 출석부</b> — 출석하면 커피 스탬프 카드에 시로 도장이 찍히는 iOS 출석부. 아이 정보가 들어갈 수 있어 서버로 아무것도 보내지 않게 만듭니다.</li>
-  </ul>
-  <h2>실험실</h2>
-  <p>토끼·커피·우주 규칙 밖에서 직접 쓰려고 만든 도구예요.</p>
-  <ul>
-    <li><b><a href="https://shiroleestudio.github.io/memobox/" rel="noopener">메모함</a></b> — 키워드를 ‘호기심의 방’ 진열장에 모아 두고 ‘산책’으로 다시 만나는 메모 앱. 서버·가입 없음, 오프라인, JSON·마크다운 백업. <a href="../privacy/memobox/">개인정보처리방침</a></li>
-  </ul>
-  <p>새 작품이 나오면 <a href="../news/">소식</a>에 먼저 올립니다.</p>
+  <p class="pempty" hidden>이 플랫폼에는 아직 없어요. 준비되면 <a href="../news/">소식</a>에 먼저 올립니다.</p>
+  <div class="works">
+  <article class="work" data-plat="web" id="timeline">
+    <h2><a href="../works/timeline/">거의 모든 것의 타임라인</a></h2><p class="tag">우주 · 토끼</p>
+    <p>한·중·일과 세계 역사를 한 시간축에 나란히 놓고 확대해 보는 연표. 홈 화면에 추가하면 오프라인에서도 열려요.</p>
+    <ul class="plats"><li data-p="web"><b>웹</b><span class="pst on">공개</span> · <a href="https://shiroleestudio.github.io/prettymuchtimelines/" rel="noopener">열기</a> <span class="pnote">PWA · 설치 가능</span></li></ul><p class="wlinks"><a href="../works/timeline/">자세히</a> · <a href="../privacy/timeline/">개인정보처리방침</a></p>
+  </article>
+  <article class="work" data-plat="android ios pc web" id="space-surfer">
+    <h2><a href="../works/space-surfer/">스페이스서퍼 달토끼</a></h2><p class="tag">우주 · 토끼</p>
+    <p>당근 로켓을 탄 달토끼가 행성 중력을 타고 나는 한 손가락 퍼즐.</p>
+    <ul class="plats"><li data-p="web"><b>웹</b><span class="pst on">개발자 버전</span> · <a href="https://shiroleestudio.github.io/swingby/?open" rel="noopener">해보기</a> <span class="pnote">모든 단계 열림</span></li><li data-p="web"><b>웹</b><span class="pst">itch.io 웹판 준비 중</span></li><li data-p="android"><b>안드로이드</b><span class="pst">준비 중</span> <span class="pnote">Google Play</span></li><li data-p="ios"><b>iOS</b><span class="pst">계획</span></li><li data-p="pc"><b>PC</b><span class="pst">계획</span> <span class="pnote">Steam</span></li></ul><p class="wlinks"><a href="../works/space-surfer/">자세히</a> · <a href="../privacy/swingby/">개인정보처리방침</a></p>
+  </article>
+  <article class="work" data-plat="web" id="coffee">
+    <h2>시로의 커피 레시피</h2><p class="tag">커피 · 토끼</p>
+    <p>추출 레시피와 타이머. 타이머가 도는 동안 시로가 커피를 내립니다.</p>
+    <ul class="plats"><li data-p="web"><b>웹</b><span class="pst on">공개</span> · <a href="https://shiroleestudio.github.io/coffee/" rel="noopener">열기</a> <span class="pnote">PWA · 설치 가능</span></li></ul><p class="wlinks"><a href="../privacy/coffee/">개인정보처리방침</a></p>
+  </article>
+  <article class="work" data-plat="ios" id="attendance">
+    <h2>시로 도장 출석부</h2><p class="tag">커피 · 토끼</p>
+    <p>출석하면 커피 스탬프 카드에 시로 도장이 찍히는 출석부. 아이 정보가 들어갈 수 있어 서버로 아무것도 보내지 않게 만듭니다.</p>
+    <ul class="plats"><li data-p="ios"><b>iOS</b><span class="pst">준비 중</span> <span class="pnote">iPad · iPhone</span></li></ul>
+  </article>
+  <article class="work" data-plat="video" id="channel">
+    <h2>아기토끼 시로 채널</h2><p class="tag">토끼 · 커피</p>
+    <p>모든 이야기의 출발점. 진짜 시로의 일상과 커피 내리는 순간.</p>
+    <ul class="plats"><li data-p="video"><b>영상</b><span class="pst on">운영 중</span> · <a href="https://www.youtube.com/@shiroleebunny" rel="noopener">보기</a> <span class="pnote">YouTube @shiroleebunny</span></li></ul>
+  </article>
+  <article class="work is-lab" data-plat="web" id="memobox">
+    <h2>메모함</h2><p class="tag">개인 도구</p>
+    <p>키워드를 ‘호기심의 방’ 진열장에 모아 두고 ‘산책’으로 다시 만나는 메모 앱. 서버·가입 없음, JSON·마크다운 백업.</p>
+    <ul class="plats"><li data-p="web"><b>웹</b><span class="pst on">공개</span> · <a href="https://shiroleestudio.github.io/memobox/" rel="noopener">열기</a> <span class="pnote">PWA · 설치 가능</span></li></ul><p class="wlinks"><a href="../privacy/memobox/">개인정보처리방침</a></p>
+  </article>
+  </div>
+  <p class="foot-note">메모함은 토끼·커피·우주 규칙 밖에서 직접 쓰려고 만든 실험실 도구예요. 새 작품이나 새 플랫폼판이 나오면 <a href="../news/">소식</a>에 먼저 올립니다.</p>
 </div>
+<script>
+(function(){
+  var box=document.querySelector('.pfilter'); if(!box) return; box.hidden=false;
+  var works=[].slice.call(document.querySelectorAll('.work')), empty=document.querySelector('.pempty');
+  function apply(f){
+    var shown=0;
+    works.forEach(function(w){
+      var ok=f==='all'||(' '+w.dataset.plat+' ').indexOf(' '+f+' ')>-1; w.hidden=!ok; if(ok) shown++;
+      [].forEach.call(w.querySelectorAll('.plats li'),function(li){li.classList.toggle('dim',f!=='all'&&li.dataset.p!==f);});
+    });
+    empty.hidden=shown>0;
+    [].forEach.call(box.querySelectorAll('button'),function(b){b.setAttribute('aria-pressed',b.dataset.f===f?'true':'false');});
+    try{history.replaceState(null,'',f==='all'?location.pathname:'#'+f);}catch(e){}
+  }
+  box.addEventListener('click',function(e){var b=e.target.closest('button'); if(b) apply(b.dataset.f);});
+  var h=location.hash.slice(1); if(box.querySelector('[data-f="'+h+'"]')) apply(h);
+})();
+</script>
 </main>
 <footer><div class="wrap">
   <div><span class="serif foot-brand">이시로스튜디오</span><br>아기토끼 · 커피 · 우주 · 원목<br>© 2026 SHIROLEESTUDIO</div>
