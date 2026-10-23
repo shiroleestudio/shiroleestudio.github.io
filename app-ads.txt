@@ -1,0 +1,3 @@
+# app-ads.txt — 이시로스튜디오 (https://shiroleestudio.github.io)
+# 애드몹 가입 후 콘솔이 주는 한 줄을 아래에 추가한다. 예:
+# google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0

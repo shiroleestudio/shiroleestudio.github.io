@@ -1,0 +1,166 @@
+/* 이시로스튜디오 허브 — 원목 찻집(킷사텐) 안에서 창밖 밤하늘을 보는 느낌.
+   외부 폰트·스크립트 없음. 색은 모두 :root 토큰. */
+:root {
+  --wood-deep: #4a2e1c;      /* 짙은 호두나무 */
+  --wood: #7a4f2e;           /* 원목 */
+  --wood-light: #b98a5c;     /* 밝은 나무결 */
+  --cream: #f6ecd9;          /* 종이·우유 */
+  --paper: #fbf5ea;
+  --coffee: #3b2314;         /* 에스프레소 */
+  --latte: #d9b78c;
+  --night: #1b2440;          /* 창밖 밤하늘 */
+  --night-deep: #0f1529;
+  --star: #ffe9a8;
+  --moon: #f3d98b;
+  --ink: #2b1d14;
+  --ink-soft: #6b5544;
+  --card: #fffaf1;
+  --line: #e2cfb4;
+  --accent: #c97b3a;         /* 카라멜 */
+  --link: #8a4a1f;
+  --shadow: 0 8px 24px rgba(58, 35, 20, 0.14);
+  --radius: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --cream: #1e1711;
+    --paper: #22190f;
+    --card: #2a1f15;
+    --line: #4a3626;
+    --ink: #f1e6d4;
+    --ink-soft: #c9b39b;
+    --link: #e4a86a;
+    --accent: #e0945a;
+    --wood-light: #8a6240;
+    --shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  }
+}
+:root[data-theme="dark"] {
+  --cream: #1e1711;
+  --paper: #22190f;
+  --card: #2a1f15;
+  --line: #4a3626;
+  --ink: #f1e6d4;
+  --ink-soft: #c9b39b;
+  --link: #e4a86a;
+  --accent: #e0945a;
+  --wood-light: #8a6240;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  color: var(--ink);
+  background: var(--cream);
+  font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.65;
+  word-break: keep-all;
+}
+a { color: var(--link); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+a:hover { color: var(--accent); }
+img, svg { display: block; max-width: 100%; }
+.wrap { width: min(960px, 100% - 32px); margin: 0 auto; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* 나무 선반(헤더) */
+.shelf {
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 2px, transparent 2px 23px),
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.08) 0 1px, transparent 1px 9px),
+    linear-gradient(180deg, var(--wood) 0%, var(--wood-deep) 100%);
+  color: var(--cream);
+  border-bottom: 6px solid var(--coffee);
+}
+.shelf .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; }
+.brand { display: flex; align-items: center; gap: 10px; color: var(--cream); text-decoration: none; font-weight: 700; letter-spacing: 0.02em; }
+.brand small { display: block; font-weight: 400; font-size: 12px; opacity: 0.8; letter-spacing: 0.08em; }
+.shelf nav a { color: var(--cream); margin-left: 14px; font-size: 14px; text-decoration: none; opacity: 0.9; }
+.shelf nav a:hover { opacity: 1; text-decoration: underline; }
+
+/* 창밖 밤하늘(히어로) */
+.sky {
+  position: relative;
+  overflow: hidden;
+  color: #f7efe0;
+  background:
+    radial-gradient(1.5px 1.5px at 12% 30%, var(--star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 28% 68%, #fff 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 42% 22%, var(--star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 58% 74%, #fff 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 70% 36%, var(--star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 84% 60%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 92% 18%, var(--star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 8% 80%, #fff 50%, transparent 51%),
+    radial-gradient(ellipse at 50% 120%, #3a2a3f 0%, transparent 60%),
+    linear-gradient(180deg, var(--night-deep) 0%, var(--night) 100%);
+  border-bottom: 12px solid var(--wood-deep);
+}
+.sky::before, .sky::after {
+  /* 창틀: 원목 세로살 */
+  content: ""; position: absolute; top: 0; bottom: 0; width: 10px;
+  background: linear-gradient(90deg, var(--wood-deep), var(--wood), var(--wood-deep));
+  opacity: 0.9;
+}
+.sky::before { left: 0; } .sky::after { right: 0; }
+.hero { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 28px; align-items: center; padding: 56px 0 48px; }
+.hero h1 { font-size: clamp(28px, 4.5vw, 44px); line-height: 1.2; margin: 0 0 12px; }
+.hero h1 em { font-style: normal; color: var(--moon); }
+.hero p { margin: 0 0 18px; font-size: clamp(15px, 1.8vw, 18px); color: #e8ddc8; }
+.tags { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 0 0 22px; }
+.tags li { font-size: 13px; padding: 5px 11px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.08); }
+.cta { display: inline-block; background: var(--accent); color: #2b1a0e; font-weight: 700; padding: 11px 18px; border-radius: 10px; text-decoration: none; }
+.cta:hover { color: #000; filter: brightness(1.05); }
+.cta.ghost { background: transparent; color: #f7efe0; border: 1px solid rgba(255,255,255,0.45); margin-left: 8px; }
+.shiro { width: min(100%, 300px); margin: 0 auto; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.45)); }
+
+/* 본문 */
+section.block { padding: 48px 0 8px; }
+section.block h2 { font-size: 22px; margin: 0 0 6px; }
+section.block h2 + p { margin: 0 0 22px; color: var(--ink-soft); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 18px 18px 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 8px;
+}
+.card h3 { margin: 0; font-size: 18px; }
+.card p { margin: 0; color: var(--ink-soft); font-size: 15px; flex: 1; }
+.card .meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; }
+.card .concept { color: var(--ink-soft); }
+.badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--line); color: var(--ink); }
+.badge.live { background: #d7ead0; color: #1f4d22; }
+:root[data-theme="dark"] .badge.live { background: #27442a; color: #c6e8c2; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .badge.live { background: #27442a; color: #c6e8c2; } }
+.card a.go { font-weight: 700; text-decoration: none; }
+.card a.go::after { content: " →"; }
+
+/* 메뉴판(개인정보·문의) */
+.menu {
+  margin-top: 24px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+}
+.menu h3 { margin: 0 0 8px; font-size: 16px; }
+.menu ul { margin: 0; padding-left: 18px; }
+.menu li { margin: 4px 0; }
+
+footer { margin-top: 48px; padding: 26px 0 36px; background: var(--wood-deep); color: #e8d9c2; font-size: 13px; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 20px; justify-content: space-between; }
+footer a { color: #f1e3cb; }
+
+/* 안쪽 페이지(개인정보처리방침) */
+.doc { padding: 40px 0 60px; max-width: 720px; }
+.doc h1 { font-size: 28px; margin: 0 0 4px; }
+.doc .updated { color: var(--ink-soft); font-size: 14px; margin: 0 0 24px; }
+.doc h2 { font-size: 18px; margin: 28px 0 8px; }
+.doc p, .doc li { font-size: 15.5px; }
+.doc .note { background: var(--paper); border-left: 4px solid var(--accent); padding: 10px 14px; border-radius: 6px; color: var(--ink-soft); font-size: 14px; }
+
+@media (max-width: 720px) {
+  .shelf .wrap { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .shelf nav a { margin: 0 14px 0 0; }
+  .hero { grid-template-columns: 1fr; padding: 40px 0 36px; }
+  .shiro { width: 200px; order: -1; }
+  .menu { grid-template-columns: 1fr; }
+  .cta.ghost { margin-left: 0; margin-top: 8px; }
+}
