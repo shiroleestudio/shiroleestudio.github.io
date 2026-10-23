@@ -5,8 +5,15 @@
   <link href="https://shiroleestudio.github.io/news/"/>
   <link rel="self" href="https://shiroleestudio.github.io/feed.xml"/>
   <id>https://shiroleestudio.github.io/</id>
-  <updated>2026-10-23T00:00:00+09:00</updated>
+  <updated>2026-10-23T16:00:00+09:00</updated>
   <author><name>이시로스튜디오</name><email>shiroleestudio@gmail.com</email></author>
+  <entry>
+    <title>커피 레시피·메모함 공개, 스페이스서퍼 미리 해보기</title>
+    <link href="https://shiroleestudio.github.io/works/"/>
+    <id>https://shiroleestudio.github.io/news/#2026-10-23-links</id>
+    <updated>2026-10-23T16:00:00+09:00</updated>
+    <summary>시로의 커피 레시피와 실험실의 메모함을 바로 쓸 수 있게 열고, 만드는 중인 스페이스서퍼 개발자 버전도 링크했어요.</summary>
+  </entry>
   <entry>
     <title>허브 사이트 문을 열었어요</title>
     <link href="https://shiroleestudio.github.io/"/>

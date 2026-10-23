@@ -121,3 +121,9 @@ img{max-width:100%;height:auto;display:block}
   .news li{grid-template-columns:1fr;gap:2px}
   .shots{grid-auto-columns:62%}
 }
+
+/* 실험실 */
+.lab{padding:20px 0 8px}
+.lab h2{font-size:14px;letter-spacing:.2em;font-family:system-ui,sans-serif;font-weight:600;color:var(--ink-2);margin:0 0 6px;text-transform:uppercase}
+.lab>p{margin:0 0 12px;font-size:14px;color:var(--ink-2)}
+.lab .item{border-bottom:1px solid var(--rule)}
