@@ -21,3 +21,11 @@
 - 시로 그래픽은 캐릭터 시트 확정 전 임시 표현이다. `TODO(character-sheet)` 주석 참고.
 - 개인 실명·소속·직업은 어디에도 넣지 않는다. 문의는 shiroleestudio@gmail.com.
 - 릴리스마다 `CHANGELOG.md` 맨 위에 한 줄 추가하고 `vX.Y.Z` 태그를 남긴다.
+
+운영
+
+- 배포: `main` 에 푸시하면 GitHub Pages 가 그대로 올린다(빌드 없음, 1~2분). 상태는 Actions 탭의 "pages build and deployment".
+- 되돌리기: 잘못 올라갔으면 `git revert` 로 커밋을 되돌려 다시 푸시한다. 설정을 만질 일은 없다.
+- 깨졌을 때 볼 곳: Settings → Pages 의 Source 가 `main` / root 인지. 그 외에는 HTML 문법 오류뿐이다.
+- 외부 계정·정기 점검·다른 저장소 목록은 `STUDIO.md`.
+- 라이선스: 코드(HTML·CSS·JS)는 `LICENSE`(MIT). 시로 캐릭터 그림과 글은 이시로스튜디오의 것으로, MIT 에 포함되지 않는다.
