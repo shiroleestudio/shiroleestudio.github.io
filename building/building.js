@@ -2,7 +2,7 @@
 // 허브 첫 화면(/)의 주인공. 1층 찻집 · 2층 갤러리(화실+공방) · 3층 다락(놀이방·천문대) + 루프탑. 지붕 위 돔에서 망원경이 나온다.
 // 모델: house.glb (model/build_house.py 로 Blender 에서 만든다. 콘셉트 그림은 두호의 나노바나나 초안).
 // 그림체: 툰 3단 명암 + 화면 공간 잉크 외곽선 + 종이 결. 색은 모델 재질 색, 배경은 site.css 토큰.
-// 가로 회전만. 카메라를 향한 벽·지붕은 걷어 낸다(단면). 방 라벨은 HTML 링크.
+// 손가락을 따라 상하·좌우로 돈다. 카메라를 향한 벽·지붕은 걷어 낸다(단면). 방 이름표는 건물 밖 양옆에 세우고 인출선으로 잇는다(HTML 링크).
 // 캐릭터는 아직 없다. TODO(character-sheet).
 import * as THREE from 'three';
 import { GLTFLoader } from '../assets/vendor/three/addons/loaders/GLTFLoader.js';
@@ -113,7 +113,7 @@ const floorNodes = [];  // { obj, floor }
 const anchors = {};
 const pickables = [];
 const center = new THREE.Vector3(0, 4.2, 0);
-let radius = 26, fitR = 6;
+let radius = 26, fitR = 6, rowsMode = false;
 let house = null;
 let dirty = true;
 
@@ -179,24 +179,30 @@ function showFloors(n) {
 }
 for (const b of floorButtons) b.addEventListener('click', () => showFloors(Number(b.dataset.floor)));
 
-// ---- 입력: 가로 드래그 회전, 탭 → 가장 가까운 방 ----
+// ---- 입력: 손가락(마우스)을 따라 상하·좌우 회전, 탭 → 가장 가까운 방 ----
 let yaw = 0.75, yawVel = 0;             // 처음엔 오른쪽 앞에서 (콘셉트 그림의 각도)
-const PITCH = 0.36;
-let dragging = false, lastX = 0, moved = 0, downAt = 0;
+let pitch = 0.36, pitchVel = 0;         // 위아래 각도. 땅 바로 위 ~ 거의 내려다보기
+const PITCH_MIN = 0.04, PITCH_MAX = 1.0;
+const clampPitch = (p) => Math.min(PITCH_MAX, Math.max(PITCH_MIN, p));
+let dragging = false, lastX = 0, lastY = 0, moved = 0, downAt = 0;
 stage.addEventListener('pointerdown', (e) => {
   if (e.target.closest('.callout')) return;
-  dragging = true; lastX = e.clientX; moved = 0; downAt = performance.now(); yawVel = 0;
+  dragging = true; lastX = e.clientX; lastY = e.clientY; moved = 0; downAt = performance.now(); yawVel = pitchVel = 0;
   stage.setPointerCapture(e.pointerId);
 });
 stage.addEventListener('pointermove', (e) => {
   if (!dragging) return;
-  const dx = e.clientX - lastX; lastX = e.clientX; moved += Math.abs(dx);
-  const d = -dx * 0.008; yaw += d; yawVel = d; dirty = true;
+  const dx = e.clientX - lastX, dy = e.clientY - lastY;
+  lastX = e.clientX; lastY = e.clientY; moved += Math.abs(dx) + Math.abs(dy);
+  const d = -dx * 0.008, dp = dy * 0.006;
+  yaw += d; yawVel = d;
+  const np = clampPitch(pitch + dp); pitchVel = np - pitch; pitch = np;
+  dirty = true;
 });
 stage.addEventListener('pointerup', (e) => {
   if (!dragging) return;
   dragging = false;
-  if (moved < 6 && performance.now() - downAt < 400) pick(e);
+  if (moved < 8 && performance.now() - downAt < 400) pick(e);
 });
 stage.addEventListener('pointercancel', () => { dragging = false; });
 const ray = new THREE.Raycaster(); const ndc = new THREE.Vector2();
@@ -234,7 +240,12 @@ function resize() {
   camera.aspect = w / h;
   const vf = THREE.MathUtils.degToRad(camera.fov) / 2;
   const hf = Math.atan(Math.tan(vf) * camera.aspect);
-  radius = (fitR / Math.sin(Math.min(vf, hf))) * 0.78;
+  // 건물은 가운데 폭의 일부만 쓰고, 양옆은 이름표 칸으로 비워 둔다
+  // 폰처럼 좁으면 이름표를 위아래 띠로 보내고 건물이 폭을 거의 다 쓴다
+  rowsMode = w < 520;
+  const hfit = Math.atan(Math.tan(hf) * (rowsMode ? 0.92 : w < 760 ? 0.56 : 0.6));
+  const vfit = Math.atan(Math.tan(vf) * (rowsMode ? 0.62 : 0.94));
+  radius = (fitR / Math.sin(Math.min(vfit, hfit))) * 0.86;
   camera.far = radius * 3; camera.near = Math.max(0.5, radius * 0.2);
   post.uniforms.near.value = camera.near; post.uniforms.far.value = camera.far;
   camera.updateProjectionMatrix();
@@ -252,13 +263,14 @@ function frame() {
   if (!dragging) {
     if (Math.abs(yawVel) > 0.0003) { yaw += yawVel; yawVel *= 0.92; dirty = true; }
     else if (!reduceMotion.matches && house) { yaw += 0.0011; dirty = true; }
+    if (Math.abs(pitchVel) > 0.0003) { pitch = clampPitch(pitch + pitchVel); pitchVel *= 0.9; dirty = true; }
   }
   if (Math.abs(targetY - lookCur) > 0.005) { lookCur += (targetY - lookCur) * 0.12; dirty = true; }
   if (house && (dirty || yaw !== lastYaw)) {
     lastYaw = yaw;
     dirty = false;
     const tgt = new THREE.Vector3(center.x, lookCur, center.z);
-    camera.position.set(tgt.x + radius * Math.cos(PITCH) * Math.sin(yaw), tgt.y + radius * Math.sin(PITCH), tgt.z + radius * Math.cos(PITCH) * Math.cos(yaw));
+    camera.position.set(tgt.x + radius * Math.cos(pitch) * Math.sin(yaw), tgt.y + radius * Math.sin(pitch), tgt.z + radius * Math.cos(pitch) * Math.cos(yaw));
     camera.lookAt(tgt);
     camDir.subVectors(camera.position, tgt).setY(0).normalize();
 
@@ -277,11 +289,39 @@ function frame() {
   requestAnimationFrame(frame);
 }
 
-// 라벨: 방 위치에 붙이고, 뒤쪽 방은 접고, 겹치면 아래로 민다
+// 라벨: 건물 밖 양옆 칸에 세우고, 방까지 인출선으로 잇는다 (도감처럼)
+const NS = 'http://www.w3.org/2000/svg';
+const leads = document.createElementNS(NS, 'svg');
+leads.setAttribute('class', 'leads');
+leads.setAttribute('aria-hidden', 'true');
+labelLayer.prepend(leads);
+const corners = Array.from({ length: 8 }, () => new THREE.Vector3());
+function houseRect(b) {
+  const box = new THREE.Box3();
+  for (const { obj, floor } of floorNodes) if (floor <= shownUpTo) box.expandByObject(obj);
+  if (box.isEmpty()) box.setFromObject(house);
+  let l = Infinity, r = -Infinity, t = Infinity, bot = -Infinity;
+  let i = 0;
+  for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+    const p = corners[i++].set(x, y, z).project(camera);
+    const sx = (p.x * 0.5 + 0.5) * b.width, sy = (-p.y * 0.5 + 0.5) * b.height;
+    l = Math.min(l, sx); r = Math.max(r, sx); t = Math.min(t, sy); bot = Math.max(bot, sy);
+  }
+  return { l, r, t, bot };
+}
+// 한 줄에서 겹치지 않게: 앞에서부터 밀고, 끝을 넘으면 거꾸로 당긴다
+function spread(list, pos, size, lo, hi, gap) {
+  let min = lo;
+  for (const it of list) { it[pos] = Math.max(it[pos], min); min = it[pos] + it[size] + gap; }
+  let max = hi;
+  for (let k = list.length - 1; k >= 0; k--) { const it = list[k]; it[pos] = Math.min(it[pos], max - it[size]); max = it[pos] - gap; }
+  for (const it of list) it[pos] = Math.max(lo, it[pos]);
+}
 function placeLabels() {
   const b = canvas.getBoundingClientRect();
-  const placed = [];
-  const items = [];
+  const hr = houseRect(b);
+  const GAP = 14, EDGE = 6;
+  const shown = [];
   ROOMS.forEach((r, i) => {
     const el = labelEls[i], a = anchors[r.id];
     if (!a || r.floor > shownUpTo) { el.hidden = true; return; }
@@ -291,23 +331,64 @@ function placeLabels() {
     v.project(camera);
     if (v.z > 1) { el.hidden = true; return; }
     el.hidden = false;
-    items.push({ el, x: (v.x * 0.5 + 0.5) * b.width, y: (-v.y * 0.5 + 0.5) * b.height, z: v.z });
+    shown.push({ el, ax: (v.x * 0.5 + 0.5) * b.width, ay: (-v.y * 0.5 + 0.5) * b.height });
   });
-  items.sort((p, q) => p.y - q.y);
-  for (const it of items) {
-    const w = it.el.offsetWidth || 120, h = it.el.offsetHeight || 34;
-    const flip = it.x > b.width * 0.6;
-    let left = flip ? it.x - w : it.x, top = it.y - h;
-    for (let k = 0; k < 6; k++) {
-      const hitRect = placed.find((p) => left < p.r && left + w > p.l && top < p.b && top + h > p.t);
-      if (!hitRect) break;
-      top = hitRect.b + 2;
+  let path = '', dots = '';
+  const put = (it, side) => {
+    for (const k of ['left', 'right', 'top', 'bottom']) it.el.classList.toggle(k, k === side);
+    it.el.style.transform = `translate(${it.x.toFixed(1)}px, ${it.y.toFixed(1)}px)`;
+    let lx, ly, bx, by;
+    if (side === 'left' || side === 'right') {
+      ly = by = it.y + it.h / 2;
+      lx = side === 'left' ? it.x + it.w + 3 : it.x - 3;
+      bx = side === 'left' ? lx + 10 : lx - 10;
+    } else {
+      lx = bx = it.x + it.w / 2;
+      ly = side === 'top' ? it.y + it.h + 3 : it.y - 3;
+      by = side === 'top' ? ly + 8 : ly - 8;
     }
-    placed.push({ l: left, r: left + w, t: top, b: top + h });
-    it.el.classList.toggle('flip', flip);
-    it.el.style.transform = `translate(${left.toFixed(1)}px, ${top.toFixed(1)}px)`;
-    it.el.style.zIndex = String(Math.round((1 - it.z) * 1000));
+    path += `M${lx.toFixed(1)} ${ly.toFixed(1)}L${bx.toFixed(1)} ${by.toFixed(1)}L${it.ax.toFixed(1)} ${it.ay.toFixed(1)}`;
+    dots += `<circle cx="${it.ax.toFixed(1)}" cy="${it.ay.toFixed(1)}" r="3.2"/>`;
+  };
+  const measure = (it, maxW) => { it.el.style.maxWidth = `${maxW.toFixed(0)}px`; it.w = it.el.offsetWidth; it.h = it.el.offsetHeight; };
+
+  if (!rowsMode) {
+    // 넓은 화면: 건물 양옆 칸. 방이 건물 어느 쪽에 있느냐로 나눈다
+    const mid = (hr.l + hr.r) / 2;
+    for (const key of ['left', 'right']) {
+      const list = shown.filter((it) => (it.ax < mid) === (key === 'left')).sort((p, q) => p.ay - q.ay);
+      const colW = Math.max(64, key === 'left' ? hr.l - GAP - EDGE : b.width - hr.r - GAP - EDGE);
+      for (const it of list) { measure(it, Math.min(colW, 220)); it.y = it.ay - it.h / 2; }
+      spread(list, 'y', 'h', EDGE, b.height - EDGE, 6);
+      for (const it of list) {
+        it.x = key === 'left' ? Math.max(EDGE, hr.l - GAP - it.w) : Math.min(b.width - EDGE - it.w, hr.r + GAP);
+        put(it, key);
+      }
+    }
+  } else {
+    // 좁은 화면: 건물 위아래 띠. 많으면 두 줄로 엇갈려 선이 이름표 사이로 지나가게
+    const mid = (hr.t + hr.bot) / 2;
+    const maxW = (b.width - 2 * EDGE - 12) / 3;
+    for (const key of ['top', 'bottom']) {
+      const list = shown.filter((it) => (it.ay < mid) === (key === 'top')).sort((p, q) => p.ax - q.ax);
+      for (const it of list) measure(it, maxW);
+      const total = list.reduce((s, it) => s + it.w + 6, 0);
+      const rows = total > b.width - 2 * EDGE ? [list.filter((_, k) => k % 2 === 0), list.filter((_, k) => k % 2 === 1)] : [list];
+      let edge = key === 'top' ? Math.max(EDGE, hr.t - GAP) : Math.min(b.height - EDGE, hr.bot + GAP);
+      for (const row of rows) {
+        const h = Math.max(0, ...row.map((it) => it.h));
+        for (const it of row) it.x = it.ax - it.w / 2;
+        spread(row, 'x', 'w', EDGE, b.width - EDGE, 6);
+        for (const it of row) {
+          it.y = key === 'top' ? Math.max(EDGE, edge - it.h) : Math.min(b.height - EDGE - it.h, edge);
+          put(it, key);
+        }
+        edge = key === 'top' ? edge - h - 6 : edge + h + 6;
+      }
+    }
   }
+  leads.setAttribute('viewBox', `0 0 ${b.width.toFixed(0)} ${b.height.toFixed(0)}`);
+  leads.innerHTML = `<path d="${path}"/>${dots}`;
 }
 
 showFloors(3);
