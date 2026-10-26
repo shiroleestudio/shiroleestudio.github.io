@@ -1,293 +1,314 @@
-// 시로의 집 — 3D 건물 뼈대 (2026-10-26, 두호 승인)
-// 1층 찻집 · 2층 갤러리(화실+공방) · 3층 천문대·루프탑·놀이방.
-// 이 파일은 "구조"만 잡는다: 상자 모델, 가로 회전, 카메라 쪽 벽 숨김, 방 라벨(HTML 링크), 층 고르기.
-// 그림체(수채·툰·외곽선·종이 결)와 glTF 모델, 캐릭터는 다음 단계. TODO(character-sheet).
-// 외부 스크립트 없음: three.js 는 ../assets/vendor/three/ 에 둔 사본.
-import * as THREE from '../assets/vendor/three/three.module.min.js';
+// 시로의 집 — 3D 건물 (2026-10-26)
+// 허브 첫 화면(/)의 주인공. 1층 찻집 · 2층 갤러리(화실+공방) · 3층 다락(놀이방·천문대) + 루프탑. 지붕 위 돔에서 망원경이 나온다.
+// 모델: house.glb (model/build_house.py 로 Blender 에서 만든다. 콘셉트 그림은 두호의 나노바나나 초안).
+// 그림체: 툰 3단 명암 + 화면 공간 잉크 외곽선 + 종이 결. 색은 모델 재질 색, 배경은 site.css 토큰.
+// 가로 회전만. 카메라를 향한 벽·지붕은 걷어 낸다(단면). 방 라벨은 HTML 링크.
+// 캐릭터는 아직 없다. TODO(character-sheet).
+import * as THREE from 'three';
+import { GLTFLoader } from '../assets/vendor/three/addons/loaders/GLTFLoader.js';
 
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('scene');
 const labelLayer = document.getElementById('labels');
 const floorButtons = [...document.querySelectorAll('[data-floor]')];
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const darkQuery = matchMedia('(prefers-color-scheme: dark)');
 
-// ---- 색: 사이트 토큰을 그대로 읽는다 (라이트/다크 둘 다) ----
-function cssColor(name, fallback) {
-  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return new THREE.Color(v || fallback);
-}
-function palette() {
-  return {
-    paper: cssColor('--paper', '#e2dbc8'),
-    ink: cssColor('--ink', '#3a2c22'),
-    wood: cssColor('--wood', '#4e3b2d'),
-    wood2: cssColor('--wood-2', '#33251c'),
-    cream: cssColor('--cream', '#e9e2d0'),
-    green: cssColor('--green', '#4a5e4f'),
-    night: cssColor('--night', '#2b3240'),
-    rule: cssColor('--rule', '#bfb39b'),
-  };
-}
-let P = palette();
-
-// ---- 방 ↔ 링크 (두호 2026-10-26 층 구성; 배치표는 확정 전 제안) ----
-// pos: 건물 좌표 (x: 가로 -5..5, y: 높이, z: 깊이 -4..4). 라벨은 이 점 위에 붙는다.
-const FLOOR_H = 3;
+// 방 ↔ 링크. 위치는 모델의 anchor_<id> 가 정한다.
 const ROOMS = [
-  { floor: 1, id: 'cafe',    name: '찻집 · 커피 레시피', note: '테이블에서 시로가 커피를 내려요', href: 'https://shiroleestudio.github.io/coffee/', pos: [-2.2, 1.2, 1.2] },
-  { floor: 1, id: 'counter', name: '카운터 · 문의',       note: '버그 신고, 제안은 여기로',          href: '../support/',  pos: [2.6, 1.3, -1.8] },
-  { floor: 1, id: 'board',   name: '칠판 · 소식',         note: '오늘의 메뉴처럼 새 소식',          href: '../news/',     pos: [0, 2.4, -3.6] },
-  { floor: 2, id: 'atelier', name: '화실 · 타임라인',     note: '벽에 길게 걸린 역사 연표',        href: '../works/timeline/', pos: [-2.6, FLOOR_H + 1.6, -1.5] },
-  { floor: 2, id: 'shop',    name: '공방 · 실험실',       note: '작업대 위의 메모함과 작은 도구들', href: '../works/#lab', pos: [2.4, FLOOR_H + 1.2, 1.2] },
-  { floor: 2, id: 'desk',    name: '작업 노트 · 시로 이야기', note: '스튜디오가 생긴 이야기',    href: '../about/',    pos: [2.6, FLOOR_H + 1.0, -2.4] },
-  { floor: 3, id: 'dome',    name: '천문대 · 우주 작품',  note: '지붕 창 밖으로 나온 망원경',      href: '../works/',    pos: [-2.4, FLOOR_H * 2 + 2.6, -1.6] },
-  { floor: 3, id: 'play',    name: '놀이방 · 스페이스서퍼', note: '장난감 로켓과 블록',          href: '../works/space-surfer/', pos: [2.4, FLOOR_H * 2 + 1.2, 1.4] },
-  { floor: 3, id: 'roof',    name: '루프탑 · 시로 채널',  note: '밤하늘을 보는 자리, 유튜브',       href: 'https://www.youtube.com/@shiroleebunny', pos: [-2.0, FLOOR_H * 2 + 1.0, 2.8] },
+  { id: 'cafe',    floor: 1, name: '찻집 · 커피 레시피',     note: '시로가 커피를 내리는 자리', href: 'https://shiroleestudio.github.io/coffee/' },
+  { id: 'counter', floor: 1, name: '카운터 · 문의',          note: '버그 신고, 제안은 여기로', href: 'support/' },
+  { id: 'board',   floor: 1, name: '칠판 · 소식',            note: '오늘의 메뉴처럼 새 소식', href: 'news/' },
+  { id: 'atelier', floor: 2, name: '화실 · 타임라인',        note: '벽에 길게 걸린 역사 연표', href: 'works/timeline/' },
+  { id: 'shop',    floor: 2, name: '공방 · 실험실',          note: '작업대 위의 작은 도구들', href: 'works/#lab' },
+  { id: 'desk',    floor: 2, name: '작업 노트 · 시로 이야기', note: '스튜디오가 생긴 이야기', href: 'about/' },
+  { id: 'dome',    floor: 3, name: '천문대 · 우주 작품',     note: '지붕 위 돔의 망원경', href: 'works/' },
+  { id: 'play',    floor: 3, name: '놀이방 · 스페이스서퍼',  note: '장난감 로켓과 블록', href: 'works/space-surfer/' },
+  { id: 'roof',    floor: 3, name: '루프탑 · 시로 채널',     note: '밤하늘을 보는 자리', href: 'https://www.youtube.com/@shiroleebunny' },
 ];
 
-// ---- 렌더러 · 장면 · 카메라 ----
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+// 링크는 사이트 뿌리 기준 (이 파일은 /building/ 에 있고, 페이지는 / 에 있다)
+const SITE = new URL('../', import.meta.url);
+for (const r of ROOMS) r.href = new URL(r.href, SITE).href;
+
+const css = (name, fb) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fb;
+
+// ---- 렌더러 ----
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setClearColor(0x000000, 0);
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
-const TARGET = new THREE.Vector3(0, 4.6, 0);
-let yaw = -0.6;            // 가로 회전만 (두호: 폰에서 잡고 돌리기)
-let yawVel = 0;
-const PITCH = 0.42;        // 고정 높이각 — 도감의 비스듬한 부감
-let radius = 23;
-let targetY = TARGET.y;
+const camera = new THREE.PerspectiveCamera(28, 1, 0.5, 200);
 
-scene.add(new THREE.HemisphereLight(0xfff6e4, 0x8a7a66, 1.1));
-const sun = new THREE.DirectionalLight(0xfff1dc, 1.2);
-sun.position.set(6, 12, 8);
-scene.add(sun);
+const hemi = new THREE.HemisphereLight(0xfff6e4, 0x9c8a72, 1.4);
+const sun = new THREE.DirectionalLight(0xfff0d8, 1.6);
+sun.position.set(-6, 14, 9);
+scene.add(hemi, sun);
 
-// 3단계 톤 그라데이션 — 수채처럼 명암을 끊는다 (그림체 작업의 출발점)
-const tone = new THREE.DataTexture(new Uint8Array([120, 120, 120, 255, 190, 190, 190, 255, 255, 255, 255, 255]), 3, 1);
+// 3단 톤 — 수채 그림처럼 명암을 끊는다
+const tone = new THREE.DataTexture(new Uint8Array([150, 150, 150, 255, 205, 205, 205, 255, 255, 255, 255, 255]), 3, 1);
 tone.minFilter = tone.magFilter = THREE.NearestFilter;
 tone.needsUpdate = true;
-const mats = {};
-function mat(key, color) {
-  if (!mats[key]) mats[key] = new THREE.MeshToonMaterial({ color, gradientMap: tone, transparent: true });
-  return mats[key];
-}
-const outlineMat = new THREE.MeshBasicMaterial({ color: P.ink, side: THREE.BackSide, transparent: true });
 
-const building = new THREE.Group();
-scene.add(building);
-const walls = [];      // { mesh, normal, floor }
-const floorGroups = {};
-const pickables = [];  // 클릭 → 링크
+// ---- 외곽선 + 종이 결 (화면 공간 후처리) ----
+const rtColor = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType });
+rtColor.depthTexture = new THREE.DepthTexture(1, 1);
+const rtNormal = new THREE.WebGLRenderTarget(1, 1);
+const normalMat = new THREE.MeshNormalMaterial();
+const post = new THREE.ShaderMaterial({
+  uniforms: {
+    tColor: { value: rtColor.texture }, tDepth: { value: rtColor.depthTexture }, tNormal: { value: rtNormal.texture },
+    texel: { value: new THREE.Vector2() }, near: { value: camera.near }, far: { value: camera.far },
+    ink: { value: new THREE.Color() }, paper: { value: new THREE.Color() }, line: { value: 1.0 },
+  },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }',
+  fragmentShader: `
+    uniform sampler2D tColor, tDepth, tNormal; uniform vec2 texel; uniform float near, far, line;
+    uniform vec3 ink, paper; varying vec2 vUv;
+    float lin(float z){ return (2.0*near*far)/(far+near-(z*2.0-1.0)*(far-near)); }
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }
+    vec3 toSRGB(vec3 c){ return pow(max(c, 0.0), vec3(1.0/2.2)); }
+    void main(){
+      vec2 o = texel * line;
+      float d0 = texture2D(tDepth, vUv).r;
+      float dc = lin(d0);
+      vec3 nc = texture2D(tNormal, vUv).rgb;
+      float ed = 0.0, en = 0.0;
+      vec2 offs[4]; offs[0]=vec2(o.x,0.); offs[1]=vec2(-o.x,0.); offs[2]=vec2(0.,o.y); offs[3]=vec2(0.,-o.y);
+      for (int i=0;i<4;i++){
+        float d = lin(texture2D(tDepth, vUv+offs[i]).r);
+        ed += abs(d - dc) / max(min(d, dc), 0.001);
+        vec3 n = texture2D(tNormal, vUv+offs[i]).rgb;
+        en += length(n - nc);
+      }
+      float edge = clamp(smoothstep(0.06, 0.14, ed) + smoothstep(0.35, 0.7, en), 0.0, 1.0);
+      vec4 c = texture2D(tColor, vUv);
+      vec3 col = mix(paper, toSRGB(c.rgb), c.a);
+      col = mix(col, ink, edge * 0.85);
+      float g = hash(floor(gl_FragCoord.xy)) * 0.035 - 0.0175;          // 종이 결
+      float g2 = hash(floor(gl_FragCoord.xy / 3.0) + 7.0) * 0.025 - 0.0125;
+      col *= 1.0 + g + g2;
+      gl_FragColor = vec4(col, 1.0);
+    }`,
+  depthTest: false, depthWrite: false,
+});
+const postScene = new THREE.Scene();
+postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), post));
+const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-function box(w, h, d, color, x, y, z, opts = {}) {
-  const geo = new THREE.BoxGeometry(w, h, d);
-  const m = new THREE.Mesh(geo, mat(color.getHexString(), color));
-  m.position.set(x, y + h / 2, z);
-  if (opts.outline !== false) {
-    const o = new THREE.Mesh(geo, outlineMat);
-    o.scale.set(1 + 0.05 / w, 1 + 0.05 / h, 1 + 0.05 / d); // 뒤집은 껍질로 잉크 외곽선
-
-    m.add(o);
-  }
-  return m;
-}
-function cyl(r, h, color, x, y, z, seg = 24) {
-  const geo = new THREE.CylinderGeometry(r, r, h, seg);
-  const m = new THREE.Mesh(geo, mat(color.getHexString(), color));
-  m.position.set(x, y + h / 2, z);
-  const o = new THREE.Mesh(geo, outlineMat);
-  o.scale.set(1 + 0.05 / r, 1 + 0.05 / h, 1 + 0.05 / r);
-  m.add(o);
-  return m;
-}
-
-const W = 10, D = 8, T = 0.25; // 가로 · 깊이 · 벽 두께
-function buildFloor(n) {
-  const g = new THREE.Group();
-  const y0 = (n - 1) * FLOOR_H;
-  g.add(box(W, T, D, P.rule, 0, y0, 0));                       // 바닥 (연한 나무색 = --rule)
-  const h = n === 3 ? FLOOR_H * 0.9 : FLOOR_H;
-  const wallColor = P.cream;
-  const specs = [
-    { size: [W, h, T], pos: [0, y0, -D / 2 + T / 2], normal: [0, 0, -1] },
-    { size: [W, h, T], pos: [0, y0, D / 2 - T / 2],  normal: [0, 0, 1] },
-    { size: [T, h, D], pos: [-W / 2 + T / 2, y0, 0], normal: [-1, 0, 0] },
-    { size: [T, h, D], pos: [W / 2 - T / 2, y0, 0],  normal: [1, 0, 0] },
-  ];
-  for (const s of specs) {
-    if (n === 3 && s.normal[2] === 1) continue;                 // 3층 앞은 루프탑(벽 없음)
-    const m = box(...s.size, wallColor, ...s.pos);
-    m.material = m.material.clone();                            // 벽마다 투명도를 따로
-    m.children[0].material = outlineMat.clone();
-    g.add(m);
-    walls.push({ mesh: m, normal: new THREE.Vector3(...s.normal), floor: n });
-  }
-  floorGroups[n] = g;
-  building.add(g);
-  return { g, y0 };
+function applyTheme() {
+  const dark = document.documentElement.dataset.theme === 'dark' || (darkQuery.matches && document.documentElement.dataset.theme !== 'light');
+  post.uniforms.paper.value.setStyle(css('--paper-2', '#d8d0bb'), THREE.NoColorSpace);
+  post.uniforms.ink.value.setStyle(dark ? '#1a140f' : '#3a2c22', THREE.NoColorSpace);
+  hemi.intensity = dark ? 0.85 : 1.4;
+  sun.intensity = dark ? 0.7 : 1.6;
+  hemi.color.set(dark ? 0x9fb0d0 : 0xfff6e4);
+  dirty = true;
 }
 
-// 1층 찻집
-{
-  const { g, y0 } = buildFloor(1);
-  g.add(box(3.2, 1.0, 0.9, P.wood2, 2.6, y0, -1.8));            // 카운터
-  for (const [x, z] of [[-3.2, 1.2], [-1.2, 1.2], [-2.2, -1.4]]) {
-    g.add(cyl(0.55, 0.08, P.wood, x, y0 + 0.8, z));             // 둥근 테이블
-    g.add(cyl(0.08, 0.8, P.wood2, x, y0, z, 10));
-    g.add(cyl(0.16, 0.14, P.cream, x + 0.2, y0 + 0.88, z - 0.1, 12)); // 커피잔
-  }
-  g.add(box(3.4, 1.6, 0.08, P.night, 0, y0 + 1.3, -D / 2 + T + 0.04)); // 칠판
-  // TODO(character-sheet): 시로 임시 표현 — 카운터 뒤 (캡슐 + 귀 두 개)
-  g.add(cyl(0.32, 0.7, P.cream, 2.6, y0, -2.6, 16));
-  g.add(cyl(0.08, 0.5, P.cream, 2.48, y0 + 0.7, -2.6, 8));
-  g.add(cyl(0.08, 0.5, P.cream, 2.72, y0 + 0.7, -2.6, 8));
-}
-// 2층 갤러리: 화실 + 공방
-{
-  const { g, y0 } = buildFloor(2);
-  g.add(box(0.06, 1.4, 4.2, P.paper, -W / 2 + T + 0.04, y0 + 1.0, -1.0)); // 벽에 걸린 긴 연표
-  g.add(box(0.9, 1.5, 0.08, P.paper, -2.6, y0 + 0.6, -1.5));    // 이젤 위 그림
-  g.add(box(0.08, 1.7, 0.08, P.wood2, -2.6, y0, -1.2));
-  g.add(box(2.8, 0.9, 1.1, P.wood2, 2.4, y0, 1.2));             // 작업대
-  g.add(box(2.6, 0.5, 0.9, P.wood, 2.6, y0, -2.4));             // 작은 책상(노트)
-  g.add(box(0.7, 0.05, 0.5, P.paper, 2.6, y0 + 0.5, -2.4));
-  // TODO(character-sheet): 카피바라씨 임시 표현 — 작업대 옆
-  g.add(cyl(0.34, 0.75, P.wood, 2.4, y0, 2.4, 16));
-}
-// 3층: 천문대 + 놀이방 + 루프탑
-{
-  const { g, y0 } = buildFloor(3);
-  g.add(box(T, FLOOR_H * 0.9, 3.4, P.cream, 0, y0, -2.3));        // 천문대 / 놀이방 칸막이
-  g.add(box(W, 0.3, D * 0.55, P.wood2, 0, y0 + FLOOR_H * 0.9, -D * 0.225)); // 지붕
-  // 데포르메 망원경: 지붕 창을 뚫고 나와 비스듬히 하늘을 본다
-  const tel = cyl(0.42, 3.0, P.green, 0, 0, 0, 18);
-  tel.position.set(-2.4, y0 + FLOOR_H * 0.9 + 0.9, -1.6);
-  tel.rotation.z = 0.9; tel.rotation.x = -0.35;
-  g.add(tel);
-  g.add(cyl(0.95, 0.5, P.wood, -2.4, y0 + FLOOR_H * 0.9 + 0.3, -1.6, 20)); // 지붕 위 둥근 창틀
-  // 놀이방: 체크 카펫, 블록, 장난감 로켓
-  g.add(box(3.0, 0.04, 2.4, P.green, 2.4, y0 + T / 2, 1.4));
-  for (const [x, z, c] of [[1.6, 0.9, P.cream], [2.1, 0.9, P.wood], [1.85, 0.9, P.green]]) g.add(box(0.4, 0.4, 0.4, c, x, y0 + T / 2 + (c === P.green ? 0.4 : 0), z));
-  g.add(cyl(0.25, 1.1, P.cream, 3.2, y0 + T / 2, 2.0, 12));
-  g.add(cyl(0.1, 0.4, P.wood2, 3.2, y0 + T / 2 + 1.1, 2.0, 8));
-  // 루프탑: 의자 둘, 담요
-  g.add(box(0.7, 0.4, 0.7, P.wood2, -2.6, y0 + T / 2, 2.6));
-  g.add(box(0.7, 0.4, 0.7, P.wood2, -1.4, y0 + T / 2, 2.6));
-  g.add(box(0.7, 0.5, 0.1, P.wood2, -2.6, y0 + T / 2 + 0.4, 2.95));
-  // TODO(character-sheet): 코알라씨 임시 표현 — 루프탑 의자
-  g.add(cyl(0.3, 0.6, P.rule, -1.4, y0 + T / 2 + 0.4, 2.6, 16));
-}
-// 땅
-scene.add(box(W + 6, 0.2, D + 6, P.paper, 0, -0.2, 0, { outline: false }));
+// ---- 모델 ----
+const DIRS = { S: new THREE.Vector3(0, 0, 1), N: new THREE.Vector3(0, 0, -1), E: new THREE.Vector3(1, 0, 0), W: new THREE.Vector3(-1, 0, 0) };
+const cuttables = [];   // { obj, dir }
+const floorNodes = [];  // { obj, floor }
+const anchors = {};
+const pickables = [];
+const center = new THREE.Vector3(0, 4.2, 0);
+let radius = 26, fitR = 6;
+let house = null;
+let dirty = true;
 
-// 클릭 영역: 방마다 보이지 않는 상자 (라벨과 같은 링크)
-for (const r of ROOMS) {
-  const hit = new THREE.Mesh(new THREE.BoxGeometry(3.2, 2.2, 2.6), new THREE.MeshBasicMaterial({ visible: false }));
-  hit.position.set(r.pos[0], r.pos[1], r.pos[2]);
-  hit.userData.room = r;
-  floorGroups[r.floor].add(hit);
-  pickables.push(hit);
+const toonCache = new Map();
+function toonize(m) {
+  if (m.name.startsWith('glow')) return new THREE.MeshBasicMaterial({ color: m.color });
+  const key = m.color.getHexString();
+  if (!toonCache.has(key)) toonCache.set(key, new THREE.MeshToonMaterial({ color: m.color, gradientMap: tone }));
+  return toonCache.get(key);
 }
 
-// ---- 라벨: 도감의 인출선처럼, HTML 로 (글자가 선명하고 그 자체가 링크) ----
+const loading = document.createElement('p');
+loading.className = 'loading';
+loading.textContent = '시로의 집을 짓는 중…';
+stage.appendChild(loading);
+
+new GLTFLoader().load(new URL('house.glb', import.meta.url).href, (gltf) => {
+  house = gltf.scene;
+  house.traverse((o) => {
+    if (o.isMesh) {
+      o.material = Array.isArray(o.material) ? o.material.map(toonize) : toonize(o.material);
+      pickables.push(o);
+    }
+    const ud = o.userData || {};
+    if (ud.cut && DIRS[ud.cut]) cuttables.push({ obj: o, dir: DIRS[ud.cut] });
+    if (typeof ud.floor === 'number' && ud.floor > 0) floorNodes.push({ obj: o, floor: ud.floor });
+    if (o.name.startsWith('anchor_')) anchors[o.name.slice(7)] = o;
+  });
+  scene.add(house);
+  const box = new THREE.Box3().setFromObject(house);
+  const sph = box.getBoundingSphere(new THREE.Sphere());
+  center.copy(sph.center); center.y -= 0.3;
+  fitR = sph.radius;
+  targetY = lookCur = center.y;
+  showFloors(shownUpTo);
+  loading.remove();
+  resize();
+  dirty = true;
+}, undefined, () => {
+  loading.textContent = '3D 모델을 불러오지 못했어요. 아래 목록에서 방을 고르세요.';
+});
+
+// ---- 라벨 ----
 const labelEls = ROOMS.map((r) => {
   const a = document.createElement('a');
   a.className = 'callout';
   a.href = r.href;
-  if (r.href.startsWith('http')) a.rel = 'noopener';
+  if (!r.href.startsWith(SITE.href)) a.rel = 'noopener';
   a.innerHTML = `<span class="pin"></span><span class="txt"><b>${r.name}</b><small>${r.note}</small></span>`;
+  a.hidden = true;
   labelLayer.appendChild(a);
   return a;
 });
 
-// ---- 층 고르기: 그 층 위는 지붕처럼 걷어낸다 (모형집) ----
+// ---- 층 고르기: 위층을 걷어 모형집처럼 ----
 let shownUpTo = 3;
+let targetY = center.y;
 function showFloors(n) {
   shownUpTo = n;
-  for (const k of [1, 2, 3]) floorGroups[k].visible = k <= n;
-  targetY = n === 3 ? 4.6 : n === 2 ? 3.2 : 1.6;
   for (const b of floorButtons) b.setAttribute('aria-pressed', String(Number(b.dataset.floor) === n));
+  targetY = n === 3 ? center.y : n === 2 ? center.y - 1.2 : center.y - 2.4;
+  dirty = true;
 }
 for (const b of floorButtons) b.addEventListener('click', () => showFloors(Number(b.dataset.floor)));
-showFloors(3);
 
-// ---- 입력: 가로 드래그 회전, 탭 → 방 링크 ----
+// ---- 입력: 가로 드래그 회전, 탭 → 가장 가까운 방 ----
+let yaw = 0.75, yawVel = 0;             // 처음엔 오른쪽 앞에서 (콘셉트 그림의 각도)
+const PITCH = 0.36;
 let dragging = false, lastX = 0, moved = 0, downAt = 0;
-stage.addEventListener('pointerdown', (e) => { dragging = true; lastX = e.clientX; moved = 0; downAt = performance.now(); yawVel = 0; stage.setPointerCapture(e.pointerId); });
+stage.addEventListener('pointerdown', (e) => {
+  if (e.target.closest('.callout')) return;
+  dragging = true; lastX = e.clientX; moved = 0; downAt = performance.now(); yawVel = 0;
+  stage.setPointerCapture(e.pointerId);
+});
 stage.addEventListener('pointermove', (e) => {
   if (!dragging) return;
   const dx = e.clientX - lastX; lastX = e.clientX; moved += Math.abs(dx);
-  const d = -dx * 0.008; yaw += d; yawVel = d;
+  const d = -dx * 0.008; yaw += d; yawVel = d; dirty = true;
 });
 stage.addEventListener('pointerup', (e) => {
+  if (!dragging) return;
   dragging = false;
-  if (moved < 6 && performance.now() - downAt < 400 && e.target === canvas) pick(e);
+  if (moved < 6 && performance.now() - downAt < 400) pick(e);
 });
 stage.addEventListener('pointercancel', () => { dragging = false; });
 const ray = new THREE.Raycaster(); const ndc = new THREE.Vector2();
+const wp = new THREE.Vector3();
 function pick(e) {
+  if (!house) return;
   const b = canvas.getBoundingClientRect();
   ndc.set(((e.clientX - b.left) / b.width) * 2 - 1, -((e.clientY - b.top) / b.height) * 2 + 1);
   ray.setFromCamera(ndc, camera);
-  const hit = ray.intersectObjects(pickables.filter((m) => m.parent.visible), false)[0];
-  if (hit) location.href = hit.object.userData.room.href;
+  const hit = ray.intersectObjects(pickables.filter(visibleChain), false)[0];
+  if (!hit) return;
+  let best = null, bd = 2.6;
+  for (const r of ROOMS) {
+    const a = anchors[r.id];
+    if (!a || r.floor > shownUpTo) continue;
+    const d = a.getWorldPosition(wp).distanceTo(hit.point);
+    if (d < bd) { bd = d; best = r; }
+  }
+  if (best) location.href = best.href;
+}
+function visibleChain(o) {
+  for (let p = o; p; p = p.parent) if (!p.visible) return false;
+  return true;
 }
 
 // ---- 크기 ----
 function resize() {
   const w = stage.clientWidth, h = stage.clientHeight;
+  if (!w || !h) return;
   renderer.setSize(w, h, false);
-  camera.aspect = w / h; camera.updateProjectionMatrix();
-  radius = w < 480 ? 27 : 23;
+  const pr = renderer.getPixelRatio();
+  rtColor.setSize(w * pr, h * pr); rtNormal.setSize(w * pr, h * pr);
+  post.uniforms.texel.value.set(1 / (w * pr), 1 / (h * pr));
+  post.uniforms.line.value = Math.max(1, pr * 0.9);
+  camera.aspect = w / h;
+  const vf = THREE.MathUtils.degToRad(camera.fov) / 2;
+  const hf = Math.atan(Math.tan(vf) * camera.aspect);
+  radius = (fitR / Math.sin(Math.min(vf, hf))) * 0.78;
+  camera.far = radius * 3; camera.near = Math.max(0.5, radius * 0.2);
+  post.uniforms.near.value = camera.near; post.uniforms.far.value = camera.far;
+  camera.updateProjectionMatrix();
+  dirty = true;
 }
 new ResizeObserver(resize).observe(stage);
-resize();
-
-// 테마가 바뀌면 색을 다시 읽는다
-function recolor() {
-  P = palette();
-  outlineMat.color.copy(P.ink);
-  for (const wl of walls) { wl.mesh.material.color.copy(P.cream); wl.mesh.children[0].material.color.copy(P.ink); }
-}
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', recolor);
+darkQuery.addEventListener('change', applyTheme);
+applyTheme();
 
 // ---- 매 프레임 ----
 const camDir = new THREE.Vector3(); const v = new THREE.Vector3();
+let lastYaw = NaN;
+let lookCur = center.y;
 function frame() {
   if (!dragging) {
-    yaw += yawVel; yawVel *= 0.92;
-    if (!reduceMotion.matches && Math.abs(yawVel) < 0.0005) yaw += 0.0012; // 가만히 두면 천천히 돈다
+    if (Math.abs(yawVel) > 0.0003) { yaw += yawVel; yawVel *= 0.92; dirty = true; }
+    else if (!reduceMotion.matches && house) { yaw += 0.0011; dirty = true; }
   }
-  TARGET.y += (targetY - TARGET.y) * 0.08;
-  camera.position.set(TARGET.x + radius * Math.cos(PITCH) * Math.sin(yaw), TARGET.y + radius * Math.sin(PITCH), TARGET.z + radius * Math.cos(PITCH) * Math.cos(yaw));
-  camera.lookAt(TARGET);
-  camDir.subVectors(camera.position, TARGET).setY(0).normalize();
+  if (Math.abs(targetY - lookCur) > 0.005) { lookCur += (targetY - lookCur) * 0.12; dirty = true; }
+  if (house && (dirty || yaw !== lastYaw)) {
+    lastYaw = yaw;
+    dirty = false;
+    const tgt = new THREE.Vector3(center.x, lookCur, center.z);
+    camera.position.set(tgt.x + radius * Math.cos(PITCH) * Math.sin(yaw), tgt.y + radius * Math.sin(PITCH), tgt.z + radius * Math.cos(PITCH) * Math.cos(yaw));
+    camera.lookAt(tgt);
+    camDir.subVectors(camera.position, tgt).setY(0).normalize();
 
-  // 카메라를 향한 벽은 걷어낸다 (단면)
-  for (const wl of walls) {
-    const facing = wl.normal.dot(camDir);
-    const want = facing > 0.2 ? 0 : 1;
-    const m = wl.mesh.material; m.opacity += (want - m.opacity) * 0.2;
-    wl.mesh.visible = m.opacity > 0.03;
-    wl.mesh.children[0].material.opacity = m.opacity;
+    for (const { obj, floor } of floorNodes) obj.visible = floor <= shownUpTo;
+    for (const { obj, dir } of cuttables) if (obj.visible) obj.visible = dir.dot(camDir) < 0.3;
+
+    // 1) 색 2) 법선 3) 외곽선·종이 결
+    renderer.setRenderTarget(rtColor); renderer.clear(); renderer.render(scene, camera);
+    scene.overrideMaterial = normalMat;
+    renderer.setRenderTarget(rtNormal); renderer.setClearColor(0x000000, 0); renderer.clear(); renderer.render(scene, camera);
+    scene.overrideMaterial = null;
+    renderer.setRenderTarget(null); renderer.render(postScene, postCam);
+
+    placeLabels();
   }
-  renderer.render(scene, camera);
-
-  // 라벨 위치 — 뒤쪽(카메라 반대편) 방의 라벨은 접는다
-  const b = canvas.getBoundingClientRect();
-  ROOMS.forEach((r, i) => {
-    const el = labelEls[i];
-    if (r.floor > shownUpTo) { el.hidden = true; return; }
-    v.set(r.pos[0], r.pos[1], r.pos[2]);
-    const side = v.clone().setY(0).normalize().dot(camDir);
-    v.project(camera);
-    const x = (v.x * 0.5 + 0.5) * b.width, y = (-v.y * 0.5 + 0.5) * b.height;
-    el.hidden = side < -0.35;
-    const flip = x > b.width * 0.62;                       // 오른쪽 가장자리면 왼쪽으로 펼친다
-    el.classList.toggle('flip', flip);
-    el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)${flip ? ' translateX(-100%)' : ''}`;
-    el.style.zIndex = String(Math.round((1 - v.z) * 1000));
-  });
   requestAnimationFrame(frame);
 }
+
+// 라벨: 방 위치에 붙이고, 뒤쪽 방은 접고, 겹치면 아래로 민다
+function placeLabels() {
+  const b = canvas.getBoundingClientRect();
+  const placed = [];
+  const items = [];
+  ROOMS.forEach((r, i) => {
+    const el = labelEls[i], a = anchors[r.id];
+    if (!a || r.floor > shownUpTo) { el.hidden = true; return; }
+    a.getWorldPosition(v);
+    const side = v.clone().sub(center).setY(0).normalize().dot(camDir);
+    if (side < -0.8 && r.id !== 'dome') { el.hidden = true; return; }
+    v.project(camera);
+    if (v.z > 1) { el.hidden = true; return; }
+    el.hidden = false;
+    items.push({ el, x: (v.x * 0.5 + 0.5) * b.width, y: (-v.y * 0.5 + 0.5) * b.height, z: v.z });
+  });
+  items.sort((p, q) => p.y - q.y);
+  for (const it of items) {
+    const w = it.el.offsetWidth || 120, h = it.el.offsetHeight || 34;
+    const flip = it.x > b.width * 0.6;
+    let left = flip ? it.x - w : it.x, top = it.y - h;
+    for (let k = 0; k < 6; k++) {
+      const hitRect = placed.find((p) => left < p.r && left + w > p.l && top < p.b && top + h > p.t);
+      if (!hitRect) break;
+      top = hitRect.b + 2;
+    }
+    placed.push({ l: left, r: left + w, t: top, b: top + h });
+    it.el.classList.toggle('flip', flip);
+    it.el.style.transform = `translate(${left.toFixed(1)}px, ${top.toFixed(1)}px)`;
+    it.el.style.zIndex = String(Math.round((1 - it.z) * 1000));
+  }
+}
+
+showFloors(3);
 frame();

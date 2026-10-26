@@ -4,87 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>시로의 집 — 이시로스튜디오</title>
-  <meta name="description" content="1층 찻집, 2층 갤러리, 3층 천문대·루프탑·놀이방. 시로가 사는 작은 건물을 돌려 보며 방마다 놓인 작품으로 들어갑니다.">
   <meta name="robots" content="noindex">
-  <link rel="canonical" href="https://shiroleestudio.github.io/building/">
-  <meta name="theme-color" content="#e2dbc8">
-  <meta property="og:site_name" content="이시로스튜디오">
-  <meta property="og:locale" content="ko_KR">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="시로의 집 — 이시로스튜디오">
-  <meta property="og:description" content="1층 찻집, 2층 갤러리, 3층 천문대·루프탑·놀이방. 시로가 사는 작은 건물을 돌려 보며 방마다 놓인 작품으로 들어갑니다.">
-  <meta property="og:url" content="https://shiroleestudio.github.io/building/">
-  <meta property="og:image" content="https://shiroleestudio.github.io/assets/og.png">
-  <link rel="icon" type="image/svg+xml" href="../assets/shiro.svg">
-  <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32.png">
-  <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
-  <link rel="alternate" type="application/atom+xml" title="이시로스튜디오 소식" href="../feed.xml">
-  <link rel="stylesheet" href="../assets/site.css">
-  <link rel="stylesheet" href="building.css">
+  <link rel="canonical" href="https://shiroleestudio.github.io/">
+  <meta http-equiv="refresh" content="0; url=../">
 </head>
 <body>
-<a class="skip" href="#main">본문으로 건너뛰기</a>
-<header><div class="wrap">
-  <a class="brand serif" href="../">이시로스튜디오<small>shiroleestudio · 아기토끼 시로</small></a>
-  <nav aria-label="주 메뉴"><a href="../works/">만드는 것</a><a href="../news/">소식</a><a href="../about/">시로 이야기</a><a href="../support/">문의</a></nav>
-</div></header>
-<main id="main">
-<div class="wrap house">
-  <p class="crumbs"><a href="../">처음</a> / 시로의 집</p>
-  <h1>시로의 집</h1>
-  <p class="updated">만드는 중 · 구조만 잡은 뼈대</p>
-  <p class="lead">1층은 찻집, 2층은 갤러리(화실과 공방), 3층은 천문대와 놀이방, 그리고 루프탑. 건물을 잡고 돌리면 이쪽 벽이 걷히고, 방마다 붙은 설명을 누르면 그 작품으로 갑니다.</p>
-
-  <div class="stage" id="stage">
-    <canvas id="scene" aria-label="시로가 사는 3층 건물. 가로로 끌어 돌릴 수 있다" role="img"></canvas>
-    <div class="labels" id="labels"></div>
-    <p class="fallback">이 브라우저에서는 3D 그림을 그릴 수 없어요. 아래 목록에서 방을 고르세요.</p>
-  </div>
-  <div class="floors" role="group" aria-label="보이는 층">
-    <span>층</span>
-    <button type="button" data-floor="1" aria-pressed="false">1층 찻집</button>
-    <button type="button" data-floor="2" aria-pressed="false">2층 갤러리</button>
-    <button type="button" data-floor="3" aria-pressed="true">3층 천문대·루프탑</button>
-  </div>
-  <p class="hint">가로로 끌어 돌리고, 방을 누르면 들어갑니다. 층을 고르면 그 위는 지붕처럼 걷어 둡니다.</p>
-
-  <section class="rooms" aria-labelledby="rooms">
-    <h2 id="rooms">Rooms · 방 안내</h2>
-    <h3>3층</h3>
-    <ul>
-      <li><a href="../works/">천문대 · 우주 작품</a><small>지붕 창 밖으로 나온 망원경</small></li>
-      <li><a href="../works/space-surfer/">놀이방 · 스페이스서퍼 달토끼</a><small>장난감 로켓과 블록</small></li>
-      <li><a href="https://www.youtube.com/@shiroleebunny" rel="noopener">루프탑 · 아기토끼 시로 채널</a><small>밤하늘을 보는 자리</small></li>
-    </ul>
-    <h3>2층 갤러리</h3>
-    <ul>
-      <li><a href="../works/timeline/">화실 · 거의 모든 것의 타임라인</a><small>벽에 길게 걸린 역사 연표</small></li>
-      <li><a href="../works/#lab">공방 · 실험실</a><small>작업대 위의 메모함과 작은 도구들</small></li>
-      <li><a href="../about/">작업 노트 · 시로 이야기</a><small>스튜디오가 생긴 이야기</small></li>
-    </ul>
-    <h3>1층 찻집</h3>
-    <ul>
-      <li><a href="https://shiroleestudio.github.io/coffee/" rel="noopener">테이블 · 시로의 커피 레시피</a><small>시로가 커피를 내리는 자리</small></li>
-      <li><a href="../news/">칠판 · 소식</a><small>오늘의 메뉴처럼 새 소식</small></li>
-      <li><a href="../support/">카운터 · 문의</a><small>버그 신고, 제안</small></li>
-    </ul>
-  </section>
-</div>
-</main>
-<footer><div class="wrap">
-  <div><span class="serif foot-brand">이시로스튜디오</span><br>아기토끼 · 커피 · 우주 · 원목<br>© 2026 SHIROLEESTUDIO</div>
-  <ul class="foot-links">
-    <li><a href="../works/">만드는 것</a></li><li><a href="../news/">소식</a></li><li><a href="../about/">시로 이야기</a></li><li><a href="../support/">자주 묻는 질문·문의</a></li><li><a href="../privacy/">개인정보처리방침</a></li>
-  </ul>
-  <ul class="foot-links">
-    <li><a href="https://www.youtube.com/@shiroleebunny" rel="noopener">YouTube</a></li><li><a href="https://github.com/shiroleestudio" rel="noopener">GitHub</a></li><li><a href="../feed.xml">RSS 소식 받기</a></li><li><a href="mailto:shiroleestudio@gmail.com">shiroleestudio@gmail.com</a></li>
-  </ul>
-</div></footer>
-<script>
-  // WebGL 이 없으면 3D 를 숨기고 목록만 남긴다
-  (function(){ var c=document.createElement('canvas'); var ok=!!(window.WebGLRenderingContext&&(c.getContext('webgl2')||c.getContext('webgl')));
-    if(!ok) document.getElementById('stage').classList.add('nowebgl'); })();
-</script>
-<script type="module" src="building.js"></script>
+<p>시로의 집은 이제 <a href="../">첫 화면</a>에 있어요.</p>
 </body>
 </html>
