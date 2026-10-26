@@ -1,5 +1,5 @@
 // 시로의 집 — 3D 건물 (2026-10-26)
-// 1층 찻집 · 2층 갤러리(화실+공방) · 3층 다락(놀이방·천문대) + 루프탑. 지붕 위 돔에서 망원경이 나온다.
+// 허브 첫 화면(/)의 주인공. 1층 찻집 · 2층 갤러리(화실+공방) · 3층 다락(놀이방·천문대) + 루프탑. 지붕 위 돔에서 망원경이 나온다.
 // 모델: house.glb (model/build_house.py 로 Blender 에서 만든다. 콘셉트 그림은 두호의 나노바나나 초안).
 // 그림체: 툰 3단 명암 + 화면 공간 잉크 외곽선 + 종이 결. 색은 모델 재질 색, 배경은 site.css 토큰.
 // 가로 회전만. 카메라를 향한 벽·지붕은 걷어 낸다(단면). 방 라벨은 HTML 링크.
@@ -17,15 +17,19 @@ const darkQuery = matchMedia('(prefers-color-scheme: dark)');
 // 방 ↔ 링크. 위치는 모델의 anchor_<id> 가 정한다.
 const ROOMS = [
   { id: 'cafe',    floor: 1, name: '찻집 · 커피 레시피',     note: '시로가 커피를 내리는 자리', href: 'https://shiroleestudio.github.io/coffee/' },
-  { id: 'counter', floor: 1, name: '카운터 · 문의',          note: '버그 신고, 제안은 여기로', href: '../support/' },
-  { id: 'board',   floor: 1, name: '칠판 · 소식',            note: '오늘의 메뉴처럼 새 소식', href: '../news/' },
-  { id: 'atelier', floor: 2, name: '화실 · 타임라인',        note: '벽에 길게 걸린 역사 연표', href: '../works/timeline/' },
-  { id: 'shop',    floor: 2, name: '공방 · 실험실',          note: '작업대 위의 작은 도구들', href: '../works/#lab' },
-  { id: 'desk',    floor: 2, name: '작업 노트 · 시로 이야기', note: '스튜디오가 생긴 이야기', href: '../about/' },
-  { id: 'dome',    floor: 3, name: '천문대 · 우주 작품',     note: '지붕 위 돔의 망원경', href: '../works/' },
-  { id: 'play',    floor: 3, name: '놀이방 · 스페이스서퍼',  note: '장난감 로켓과 블록', href: '../works/space-surfer/' },
+  { id: 'counter', floor: 1, name: '카운터 · 문의',          note: '버그 신고, 제안은 여기로', href: 'support/' },
+  { id: 'board',   floor: 1, name: '칠판 · 소식',            note: '오늘의 메뉴처럼 새 소식', href: 'news/' },
+  { id: 'atelier', floor: 2, name: '화실 · 타임라인',        note: '벽에 길게 걸린 역사 연표', href: 'works/timeline/' },
+  { id: 'shop',    floor: 2, name: '공방 · 실험실',          note: '작업대 위의 작은 도구들', href: 'works/#lab' },
+  { id: 'desk',    floor: 2, name: '작업 노트 · 시로 이야기', note: '스튜디오가 생긴 이야기', href: 'about/' },
+  { id: 'dome',    floor: 3, name: '천문대 · 우주 작품',     note: '지붕 위 돔의 망원경', href: 'works/' },
+  { id: 'play',    floor: 3, name: '놀이방 · 스페이스서퍼',  note: '장난감 로켓과 블록', href: 'works/space-surfer/' },
   { id: 'roof',    floor: 3, name: '루프탑 · 시로 채널',     note: '밤하늘을 보는 자리', href: 'https://www.youtube.com/@shiroleebunny' },
 ];
+
+// 링크는 사이트 뿌리 기준 (이 파일은 /building/ 에 있고, 페이지는 / 에 있다)
+const SITE = new URL('../', import.meta.url);
+for (const r of ROOMS) r.href = new URL(r.href, SITE).href;
 
 const css = (name, fb) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fb;
 
@@ -126,7 +130,7 @@ loading.className = 'loading';
 loading.textContent = '시로의 집을 짓는 중…';
 stage.appendChild(loading);
 
-new GLTFLoader().load('house.glb', (gltf) => {
+new GLTFLoader().load(new URL('house.glb', import.meta.url).href, (gltf) => {
   house = gltf.scene;
   house.traverse((o) => {
     if (o.isMesh) {
@@ -157,7 +161,7 @@ const labelEls = ROOMS.map((r) => {
   const a = document.createElement('a');
   a.className = 'callout';
   a.href = r.href;
-  if (r.href.startsWith('http')) a.rel = 'noopener';
+  if (!r.href.startsWith(SITE.href)) a.rel = 'noopener';
   a.innerHTML = `<span class="pin"></span><span class="txt"><b>${r.name}</b><small>${r.note}</small></span>`;
   a.hidden = true;
   labelLayer.appendChild(a);

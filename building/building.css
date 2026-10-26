@@ -1,8 +1,10 @@
-/* 시로의 집 — 3D 건물 페이지. 색은 site.css 토큰만. */
-.house{padding:24px 0 8px}
-.house h1{font-size:clamp(24px,4vw,32px);margin:0 0 4px;line-height:1.4}
+/* 시로의 집 — 허브 첫 화면의 3D 건물. 색은 site.css 토큰만. */
+.house{padding:36px 0 8px}
+.house .kw{margin:0 0 10px}
+.house .lead{max-width:640px}
+.house h1{font-size:clamp(26px,4vw,38px);margin:0 0 12px;line-height:1.35}
 .house .updated{font-family:system-ui,sans-serif;font-size:12px;letter-spacing:.1em;color:var(--ink-2);margin:0 0 16px}
-.stage{position:relative;height:min(72vh,640px);min-height:360px;border:10px solid var(--wood);outline:1px solid var(--wood-2);background:var(--paper-2);
+.stage{position:relative;height:min(78vh,720px);min-height:380px;margin-top:18px;border:10px solid var(--wood);outline:1px solid var(--wood-2);background:var(--paper-2);
   background-image:repeating-linear-gradient(0deg,rgba(0,0,0,.025) 0 1px,transparent 1px 3px);touch-action:pan-y;cursor:grab;user-select:none;overflow:hidden}
 .stage:active{cursor:grabbing}
 .stage canvas{display:block;width:100%;height:100%}

@@ -20,6 +20,7 @@
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
   <link rel="alternate" type="application/atom+xml" title="이시로스튜디오 소식" href="feed.xml">
   <link rel="stylesheet" href="assets/site.css">
+  <link rel="stylesheet" href="building/building.css">
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "이시로스튜디오", "alternateName": ["shiroleestudio", "아기토끼 시로"], "url": "https://shiroleestudio.github.io/", "logo": "https://shiroleestudio.github.io/assets/apple-touch-icon.png", "email": "shiroleestudio@gmail.com", "sameAs": ["https://www.youtube.com/@shiroleebunny", "https://github.com/shiroleestudio"]}</script>
 </head>
 <body>
@@ -29,33 +30,22 @@
   <nav aria-label="주 메뉴"><a href="works/">만드는 것</a><a href="news/">소식</a><a href="about/">시로 이야기</a><a href="support/">문의</a></nav>
 </div></header>
 <main id="main">
-<section class="wrap hero">
-  <div>
-    <p class="kw">아기토끼 · 커피 · 우주 · 원목</p>
-    <h1>아기토끼 이시로와 함께하는<br>작은 공방입니다.</h1>
-    <p>원목 찻집 창가에서 우주를 보는 반려 토끼 시로와 함께, 역사 연표·우주 퍼즐 게임·커피 도구처럼 직접 쓰고 싶은 것을 만들어 무료로 내놓습니다.</p>
-    <a class="btn fill" href="https://shiroleestudio.github.io/prettymuchtimelines/">타임라인 바로 열기</a><a class="btn" href="works/">만드는 것 모두 보기</a>
+<section class="wrap house" aria-labelledby="hi">
+  <p class="kw">아기토끼 · 커피 · 우주 · 원목</p>
+  <h1 id="hi">아기토끼 이시로와 함께하는<br>작은 공방입니다.</h1>
+  <p class="lead">1층 찻집, 2층 화실과 공방, 3층 다락의 놀이방과 천문대, 그리고 루프탑. 집을 잡고 돌리면 이쪽 벽이 걷히고, 방에 붙은 이름을 누르면 그 작품으로 들어갑니다.</p>
+  <div class="stage" id="stage">
+    <canvas id="scene" aria-label="시로가 사는 3층 오두막. 가로로 끌어 돌릴 수 있다" role="img"></canvas>
+    <div class="labels" id="labels"></div>
+    <p class="fallback">이 브라우저에서는 3D 그림을 그릴 수 없어요. 아래 메뉴에서 골라 주세요.</p>
   </div>
-  <div>
-    <div class="window">
-      <svg viewBox="0 0 300 330" role="img" aria-label="원목 찻집 창가에서 커피잔 옆에 앉아 밤하늘의 달을 보는 아기토끼 시로">
-        <!-- TODO(character-sheet): 시로 임시 표현(2색 실루엣). 캐릭터 시트 확정 후 교체 -->
-        <rect width="300" height="330" fill="#2b3240"/>
-        <circle cx="76" cy="62" r="24" fill="#cdbf97"/><circle cx="66" cy="54" r="25" fill="#2b3240"/>
-        <g fill="#cdbf97"><circle cx="128" cy="34" r="1.6"/><circle cx="232" cy="28" r="1.2"/><circle cx="262" cy="92" r="1.4"/><circle cx="34" cy="132" r="1.2"/><circle cx="118" cy="110" r="1.3"/><circle cx="204" cy="64" r="1"/><circle cx="276" cy="150" r="1.2"/></g>
-        <g fill="#4e3b2d"><rect x="146" y="0" width="8" height="240"/><rect x="0" y="118" width="300" height="8"/></g>
-        <rect x="0" y="240" width="300" height="90" fill="#3e2d22"/>
-        <rect x="0" y="240" width="300" height="6" fill="#5a4332"/>
-        <path d="M0 262 h300 M0 288 h300 M0 312 h300" stroke="#352619" stroke-width="2"/>
-        <path d="M44 214 h40 v20 a20 20 0 0 1 -40 0z" fill="#e8dcc3"/>
-        <path d="M84 220 q14 2 12 12 q-2 8 -12 7" fill="none" stroke="#e8dcc3" stroke-width="5"/>
-        <path d="M56 204 q3 -7 0 -14 M66 206 q3 -7 0 -14" stroke="#e8dcc3" stroke-width="2" fill="none" stroke-linecap="round" opacity=".6"/>
-        <g fill="#e8dcc3"><ellipse cx="200" cy="214" rx="48" ry="30"/><circle cx="198" cy="174" r="34"/><ellipse cx="180" cy="128" rx="10" ry="36" transform="rotate(-8 180 128)"/><ellipse cx="218" cy="126" rx="10" ry="36" transform="rotate(10 218 126)"/></g>
-        <g fill="#2b3240"><circle cx="188" cy="172" r="3"/><circle cx="208" cy="170" r="3"/><ellipse cx="198" cy="181" rx="2.5" ry="1.8"/></g>
-      </svg>
-    </div>
-    <div class="sill"></div>
+  <div class="floors" role="group" aria-label="보이는 층">
+    <span>층</span>
+    <button type="button" data-floor="1" aria-pressed="false">1층 찻집</button>
+    <button type="button" data-floor="2" aria-pressed="false">2층 갤러리</button>
+    <button type="button" data-floor="3" aria-pressed="true">3층 다락·루프탑</button>
   </div>
+  <p class="hint">가로로 끌어 돌리고, 방을 누르면 들어갑니다. 아래에는 같은 것을 글로 적은 메뉴판이 있어요.</p>
 </section>
 
 <section class="wrap feature" aria-labelledby="ft">
@@ -113,5 +103,11 @@
     <li><a href="https://www.youtube.com/@shiroleebunny" rel="noopener">YouTube</a></li><li><a href="https://github.com/shiroleestudio" rel="noopener">GitHub</a></li><li><a href="feed.xml">RSS 소식 받기</a></li><li><a href="mailto:shiroleestudio@gmail.com">shiroleestudio@gmail.com</a></li>
   </ul>
 </div></footer>
+<script>
+  (function(){ var c=document.createElement('canvas'); var ok=!!(window.WebGLRenderingContext&&(c.getContext('webgl2')||c.getContext('webgl')));
+    if(!ok) document.getElementById('stage').classList.add('nowebgl'); })();
+</script>
+<script type="importmap">{"imports":{"three":"./assets/vendor/three/three.module.min.js"}}</script>
+<script type="module" src="building/building.js"></script>
 </body>
 </html>
