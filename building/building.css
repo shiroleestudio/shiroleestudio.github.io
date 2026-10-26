@@ -1,0 +1,36 @@
+/* 시로의 집 — 3D 건물 페이지. 색은 site.css 토큰만. */
+.house{padding:24px 0 8px}
+.house h1{font-size:clamp(24px,4vw,32px);margin:0 0 4px;line-height:1.4}
+.house .updated{font-family:system-ui,sans-serif;font-size:12px;letter-spacing:.1em;color:var(--ink-2);margin:0 0 16px}
+.stage{position:relative;height:min(72vh,640px);min-height:360px;border:10px solid var(--wood);outline:1px solid var(--wood-2);background:var(--paper-2);
+  background-image:repeating-linear-gradient(0deg,rgba(0,0,0,.025) 0 1px,transparent 1px 3px);touch-action:pan-y;cursor:grab;user-select:none;overflow:hidden}
+.stage:active{cursor:grabbing}
+.stage canvas{display:block;width:100%;height:100%}
+.labels{position:absolute;inset:0;pointer-events:none}
+.callout{position:absolute;left:0;top:0;pointer-events:auto;display:flex;align-items:flex-end;gap:0;text-decoration:none;color:var(--ink);
+  transform:translate(-9999px,-9999px)}
+.callout .pin{display:block;width:8px;height:8px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 2px var(--paper);margin:0 0 -4px -4px}
+.callout .txt{display:block;border-left:1px solid var(--ink);padding:0 0 10px 10px;margin:0 0 4px 0;line-height:1.3;white-space:nowrap}
+.callout b{display:block;font-family:"Apple Myungjo","Noto Serif KR","Nanum Myeongjo",Georgia,serif;font-weight:600;font-size:14px;background:var(--paper);padding:1px 4px}
+.callout small{display:block;font-size:12px;color:var(--ink-2);background:var(--paper);padding:0 4px}
+.callout.flip{flex-direction:row-reverse}
+.callout.flip .pin{margin:0 -4px -4px 0}
+.callout.flip .txt{border-left:0;border-right:1px solid var(--ink);padding:0 10px 10px 0;text-align:right}
+.callout:hover b,.callout:focus-visible b{text-decoration:underline;text-decoration-color:var(--mustard)}
+.callout:focus-visible{outline:2px solid var(--mustard);outline-offset:2px}
+.floors{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:12px 0 0;font-size:13px;color:var(--ink-2)}
+.floors button{font:inherit;font-size:13px;letter-spacing:.04em;background:transparent;color:var(--ink-2);border:1px solid var(--rule);border-radius:2px;padding:5px 12px;cursor:pointer}
+.floors button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.floors button:focus-visible{outline:2px solid var(--mustard);outline-offset:2px}
+.hint{font-size:13px;color:var(--ink-2);margin:10px 0 0}
+.rooms{margin:28px 0 0}
+.rooms h2{font-size:14px;letter-spacing:.2em;font-family:system-ui,sans-serif;font-weight:600;color:var(--ink-2);margin:0 0 6px;text-transform:uppercase}
+.rooms h3{font-size:15px;margin:14px 0 2px;color:var(--ink-2);font-family:system-ui,sans-serif;font-weight:600;letter-spacing:.06em}
+.rooms ul{list-style:none;margin:0;padding:0}
+.rooms li{padding:8px 0;border-bottom:1px dotted var(--rule);font-size:15px}
+.rooms li small{display:block;font-size:13px;color:var(--ink-2)}
+.stage.nowebgl canvas,.stage.nowebgl .labels{display:none}
+.stage .fallback{display:none;padding:24px;color:var(--ink-2);font-size:14px}
+.stage.nowebgl .fallback{display:block}
+@media(max-width:720px){.stage{height:62vh;min-height:320px}.callout b{font-size:13px}.callout small{display:none}}
+@media(max-width:480px){.callout .txt{white-space:normal;max-width:120px}}
