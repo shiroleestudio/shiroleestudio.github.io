@@ -32,9 +32,13 @@
 
 ## 시로의 집 (`building/`, 만드는 중)
 
-3D 건물 페이지의 뼈대. 1층 찻집 · 2층 갤러리(화실+공방) · 3층 천문대·루프탑·놀이방. 아직 첫 화면에서 링크하지 않는다(`noindex`).
+3D 건물 페이지. 1층 찻집 · 2층 갤러리(화실+공방) · 3층 다락(놀이방·천문대) + 루프탑, 지붕 위 돔에서 망원경이 나온다. 아직 첫 화면에서 링크하지 않는다(`noindex`).
 
-- `building/building.js` — 장면·회전·벽 숨김·라벨. 방과 링크는 맨 위 `ROOMS` 표 하나로 관리한다(라벨과 클릭 영역과 아래 2D 목록을 함께 고칠 것).
-- 상자 모델뿐이다. 그림체(수채·툰 외곽선·종이 결)·glTF 모델·캐릭터는 다음 단계. 캐릭터는 `TODO(character-sheet)`.
-- three.js 는 `assets/vendor/three/` 에 둔 사본(MIT). 외부 스크립트 규칙은 그대로 지킨다.
-- 가로 회전만, 층을 고르면 그 위는 걷어낸다. WebGL 이 없거나 '동작 줄이기'면 각각 목록만/정지 화면.
+- `building/house.glb` — 모델. **손으로 고치지 않는다.** `building/model/build_house.py` 를 고치고 다시 만든다:
+  `pip install bpy` (Python 3.11) 후 `python building/model/build_house.py building/house.glb`, 또는 `blender -b -P building/model/build_house.py -- building/house.glb`.
+- 모델과 코드의 약속: 노드 extras 의 `floor`(층)·`cut`(S/N/E/W, 카메라가 그쪽이면 걷어 냄), 빈 객체 `anchor_<방id>`(라벨 자리), 재질 이름 `glow*`(불 켜진 창).
+- `building/building.js` — 회전·단면·층 고르기·라벨·그림체(툰 3단 명암 + 화면 공간 잉크 외곽선 + 종이 결). 방과 링크는 맨 위 `ROOMS`. 바꾸면 아래 2D 목록(`index.html`)도 같이.
+- 콘셉트 그림(나노바나나 초안)은 저장소 밖 프로젝트 폴더에 있다. AI 초안이라 사이트에 올리지 않는다.
+- 캐릭터(시로·카피바라씨·코알라씨)는 캐릭터 시트 뒤에 넣는다. `TODO(character-sheet)`.
+- three.js r180 과 GLTFLoader 는 `assets/vendor/three/`(MIT) 사본, `importmap` 으로 `three` 를 가리킨다. 외부 스크립트 없음.
+- 가로 회전만, 층을 고르면 그 위는 걷어 낸다. WebGL 이 없으면 목록만, '동작 줄이기'면 자동 회전 없음.

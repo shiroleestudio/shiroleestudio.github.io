@@ -34,3 +34,4 @@
 .stage.nowebgl .fallback{display:block}
 @media(max-width:720px){.stage{height:62vh;min-height:320px}.callout b{font-size:13px}.callout small{display:none}}
 @media(max-width:480px){.callout .txt{white-space:normal;max-width:120px}}
+.loading{position:absolute;inset:auto 0 45% 0;text-align:center;font-size:14px;color:var(--ink-2);margin:0}
