@@ -243,8 +243,8 @@ function resize() {
   // 건물은 가운데 폭의 일부만 쓰고, 양옆은 이름표 칸으로 비워 둔다
   // 폰처럼 좁으면 이름표를 위아래 띠로 보내고 건물이 폭을 거의 다 쓴다
   rowsMode = w < 520;
-  const hfit = Math.atan(Math.tan(hf) * (rowsMode ? 0.92 : w < 760 ? 0.56 : 0.6));
-  const vfit = Math.atan(Math.tan(vf) * (rowsMode ? 0.62 : 0.94));
+  const hfit = Math.atan(Math.tan(hf) * (rowsMode ? 0.92 : w < 760 ? 0.5 : 0.52));
+  const vfit = Math.atan(Math.tan(vf) * (rowsMode ? 0.56 : 0.94));
   radius = (fitR / Math.sin(Math.min(vfit, hfit))) * 0.86;
   camera.far = radius * 3; camera.near = Math.max(0.5, radius * 0.2);
   post.uniforms.near.value = camera.near; post.uniforms.far.value = camera.far;
@@ -320,7 +320,7 @@ function spread(list, pos, size, lo, hi, gap) {
 function placeLabels() {
   const b = canvas.getBoundingClientRect();
   const hr = houseRect(b);
-  const GAP = 14, EDGE = 6;
+  const GAP = 14, EDGE = 6, OUT = 16;
   const shown = [];
   ROOMS.forEach((r, i) => {
     const el = labelEls[i], a = anchors[r.id];
@@ -360,8 +360,10 @@ function placeLabels() {
       const colW = Math.max(64, key === 'left' ? hr.l - GAP - EDGE : b.width - hr.r - GAP - EDGE);
       for (const it of list) { measure(it, Math.min(colW, 220)); it.y = it.ay - it.h / 2; }
       spread(list, 'y', 'h', EDGE, b.height - EDGE, 6);
+      // 무대 가장자리에 붙이고 긴 인출선으로 잇는다 (건물과 겹치면 건물 쪽 끝까지만)
       for (const it of list) {
-        it.x = key === 'left' ? Math.max(EDGE, hr.l - GAP - it.w) : Math.min(b.width - EDGE - it.w, hr.r + GAP);
+        it.x = key === 'left' ? Math.min(OUT, hr.l - GAP - it.w) : Math.max(b.width - OUT - it.w, hr.r + GAP);
+        it.x = Math.max(EDGE, Math.min(b.width - EDGE - it.w, it.x));
         put(it, key);
       }
     }
@@ -374,7 +376,9 @@ function placeLabels() {
       for (const it of list) measure(it, maxW);
       const total = list.reduce((s, it) => s + it.w + 6, 0);
       const rows = total > b.width - 2 * EDGE ? [list.filter((_, k) => k % 2 === 0), list.filter((_, k) => k % 2 === 1)] : [list];
-      let edge = key === 'top' ? Math.max(EDGE, hr.t - GAP) : Math.min(b.height - EDGE, hr.bot + GAP);
+      // 띠는 무대 위아래 끝에서 시작해 건물 쪽으로 쌓는다. 먼 줄을 바깥에
+      const bandH = rows.reduce((s, row) => s + Math.max(0, ...row.map((it) => it.h)) + 6, 0);
+      let edge = key === 'top' ? Math.min(OUT + bandH, Math.max(EDGE + bandH, hr.t - GAP)) : Math.max(b.height - OUT - bandH, Math.min(b.height - EDGE - bandH, hr.bot + GAP));
       for (const row of rows) {
         const h = Math.max(0, ...row.map((it) => it.h));
         for (const it of row) it.x = it.ax - it.w / 2;
