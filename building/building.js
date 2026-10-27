@@ -154,6 +154,7 @@ new GLTFLoader().load(new URL('house.glb', import.meta.url).href, (gltf) => {
   dirty = true;
 }, undefined, () => {
   loading.textContent = '3D 모델을 불러오지 못했어요. 아래 목록에서 방을 고르세요.';
+  stage.classList.add('failed');
 });
 
 // ---- 라벨 ----

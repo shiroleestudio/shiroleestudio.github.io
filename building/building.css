@@ -1,4 +1,21 @@
 /* 시로의 집 — 허브 첫 화면의 3D 건물. 색은 site.css 토큰만. */
+/* 첫 화면은 3D 만: 머리줄 · 무대(남는 높이 전부) · 층 버튼 줄 · 한 줄 바닥글 */
+.home-page{min-height:100vh;min-height:100svh;display:flex;flex-direction:column}
+.home-page main{flex:1;display:flex;flex-direction:column}
+.home-page .house{flex:1;display:flex;flex-direction:column;padding:0}
+.home-page .stage{flex:1;height:auto;min-height:340px;margin:0;border:0;outline:0;border-bottom:1px solid var(--rule)}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;width:min(900px,100% - 32px);margin:0 auto;padding:6px 0}
+.stage.nowebgl ~ .bar,.stage.failed ~ .bar{display:none}
+.home-page header .wrap{padding:12px 0}
+.bar .floors,.bar .hint{margin:0}
+footer.slim{margin:0;padding:8px 0;background:transparent}
+footer.slim .wrap{display:flex;flex-wrap:wrap;gap:6px 16px;line-height:1.6}
+footer.slim a{color:var(--ink-2)}
+/* 방 목록: 평소엔 화면낭독기·검색엔진용, 3D 가 안 되면 보인다 */
+.home-page .rooms{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.home-page .stage.nowebgl ~ .rooms,.home-page .stage.failed ~ .rooms{position:static;width:min(900px,100% - 32px);height:auto;margin:16px auto 0;overflow:visible;clip:auto;white-space:normal}
+.home-page .stage.nowebgl{flex:0 0 auto;min-height:0}
 .house{padding:36px 0 8px}
 .house .kw{margin:0 0 10px}
 .house .lead{max-width:640px}
@@ -34,9 +51,10 @@
 .rooms ul{list-style:none;margin:0;padding:0}
 .rooms li{padding:8px 0;border-bottom:1px dotted var(--rule);font-size:15px}
 .rooms li small{display:block;font-size:13px;color:var(--ink-2)}
+.rooms h2{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 .stage.nowebgl canvas,.stage.nowebgl .labels{display:none}
 .stage .fallback{display:none;padding:24px;color:var(--ink-2);font-size:14px}
 .stage.nowebgl .fallback{display:block}
-@media(max-width:720px){.stage{height:62vh;min-height:320px}.callout b{font-size:13px}.callout small{display:none}}
+@media(max-width:720px){.stage{height:62vh;min-height:320px}.home-page .stage{height:auto}.callout b{font-size:13px}.callout small{display:none}}
 @media(max-width:480px){.callout{padding:3px 5px}.callout b{font-size:12.5px}}
 .loading{position:absolute;inset:auto 0 45% 0;text-align:center;font-size:14px;color:var(--ink-2);margin:0}
