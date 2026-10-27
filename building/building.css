@@ -9,6 +9,9 @@
 .stage.nowebgl ~ .bar,.stage.failed ~ .bar{display:none}
 .home-page header .wrap{padding:12px 0}
 .bar .floors,.bar .hint{margin:0}
+.zoom{display:flex;gap:6px;margin-right:auto}
+.zoom button{font:inherit;font-size:16px;line-height:1;width:34px;height:31px;background:transparent;color:var(--ink-2);border:1px solid var(--rule);border-radius:2px;cursor:pointer}
+.zoom button:focus-visible{outline:2px solid var(--mustard);outline-offset:2px}
 footer.slim{margin:0;padding:8px 0;background:transparent}
 footer.slim .wrap{display:flex;flex-wrap:wrap;gap:6px 16px;line-height:1.6}
 footer.slim a{color:var(--ink-2)}
