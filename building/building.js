@@ -110,6 +110,7 @@ function applyTheme() {
 const DIRS = { S: new THREE.Vector3(0, 0, 1), N: new THREE.Vector3(0, 0, -1), E: new THREE.Vector3(1, 0, 0), W: new THREE.Vector3(-1, 0, 0) };
 const cuttables = [];   // { obj, dir }
 const floorNodes = [];  // { obj, floor }
+const baseNodes = [];   // 땅·바깥 소품: 1층만 볼 때와 전체일 때만
 const anchors = {};
 const pickables = [];
 const center = new THREE.Vector3(0, 4.2, 0);
@@ -140,6 +141,7 @@ new GLTFLoader().load(new URL('house.glb', import.meta.url).href, (gltf) => {
     const ud = o.userData || {};
     if (ud.cut && DIRS[ud.cut]) cuttables.push({ obj: o, dir: DIRS[ud.cut] });
     if (typeof ud.floor === 'number' && ud.floor > 0) floorNodes.push({ obj: o, floor: ud.floor });
+    if (ud.floor === 0) baseNodes.push(o);
     if (o.name.startsWith('anchor_')) anchors[o.name.slice(7)] = o;
   });
   scene.add(house);
@@ -148,7 +150,7 @@ new GLTFLoader().load(new URL('house.glb', import.meta.url).href, (gltf) => {
   center.copy(sph.center); center.y -= 0.3;
   fitR = sph.radius;
   targetY = lookCur = center.y;
-  showFloors(shownUpTo);
+  showFloors(shownFloor);
   loading.remove();
   resize();
   dirty = true;
@@ -169,13 +171,26 @@ const labelEls = ROOMS.map((r) => {
   return a;
 });
 
-// ---- 층 고르기: 위층을 걷어 모형집처럼 ----
-let shownUpTo = 3;
+// ---- 층 고르기: 기본은 집 전체, 층을 고르면 그 층만 떼어 보여 준다 ----
+let shownFloor = 0;     // 0 = 전체
 let targetY = center.y;
+let zoom = 1, zoomTarget = 1;
+const floorOn = (f) => shownFloor === 0 || f === shownFloor;
 function showFloors(n) {
-  shownUpTo = n;
+  shownFloor = n;
   for (const b of floorButtons) b.setAttribute('aria-pressed', String(Number(b.dataset.floor) === n));
-  targetY = n === 3 ? center.y : n === 2 ? center.y - 1.2 : center.y - 2.4;
+  for (const { obj, floor } of floorNodes) obj.visible = floorOn(floor);
+  for (const o of baseNodes) o.visible = n <= 1;
+  targetY = center.y; zoomTarget = 1;
+  if (n > 0 && house) {
+    const box = new THREE.Box3();
+    for (const { obj, floor } of floorNodes) if (floor === n) box.expandByObject(obj);
+    if (!box.isEmpty()) {
+      const sph = box.getBoundingSphere(new THREE.Sphere());
+      targetY = sph.center.y;
+      zoomTarget = Math.min(1, Math.max(0.55, sph.radius / fitR));
+    }
+  }
   dirty = true;
 }
 for (const b of floorButtons) b.addEventListener('click', () => showFloors(Number(b.dataset.floor)));
@@ -218,7 +233,7 @@ function pick(e) {
   let best = null, bd = 2.6;
   for (const r of ROOMS) {
     const a = anchors[r.id];
-    if (!a || r.floor > shownUpTo) continue;
+    if (!a || !floorOn(r.floor)) continue;
     const d = a.getWorldPosition(wp).distanceTo(hit.point);
     if (d < bd) { bd = d; best = r; }
   }
@@ -267,15 +282,17 @@ function frame() {
     if (Math.abs(pitchVel) > 0.0003) { pitch = clampPitch(pitch + pitchVel); pitchVel *= 0.9; dirty = true; }
   }
   if (Math.abs(targetY - lookCur) > 0.005) { lookCur += (targetY - lookCur) * 0.12; dirty = true; }
+  if (Math.abs(zoomTarget - zoom) > 0.002) { zoom += (zoomTarget - zoom) * 0.12; dirty = true; }
   if (house && (dirty || yaw !== lastYaw)) {
     lastYaw = yaw;
     dirty = false;
     const tgt = new THREE.Vector3(center.x, lookCur, center.z);
-    camera.position.set(tgt.x + radius * Math.cos(pitch) * Math.sin(yaw), tgt.y + radius * Math.sin(pitch), tgt.z + radius * Math.cos(pitch) * Math.cos(yaw));
+    const rr = radius * zoom;
+    camera.position.set(tgt.x + rr * Math.cos(pitch) * Math.sin(yaw), tgt.y + rr * Math.sin(pitch), tgt.z + rr * Math.cos(pitch) * Math.cos(yaw));
     camera.lookAt(tgt);
     camDir.subVectors(camera.position, tgt).setY(0).normalize();
 
-    for (const { obj, floor } of floorNodes) obj.visible = floor <= shownUpTo;
+    for (const { obj, floor } of floorNodes) obj.visible = floorOn(floor);
     for (const { obj, dir } of cuttables) if (obj.visible) obj.visible = dir.dot(camDir) < 0.3;
 
     // 1) 색 2) 법선 3) 외곽선·종이 결
@@ -299,7 +316,7 @@ labelLayer.prepend(leads);
 const corners = Array.from({ length: 8 }, () => new THREE.Vector3());
 function houseRect(b) {
   const box = new THREE.Box3();
-  for (const { obj, floor } of floorNodes) if (floor <= shownUpTo) box.expandByObject(obj);
+  for (const { obj, floor } of floorNodes) if (floorOn(floor)) box.expandByObject(obj);
   if (box.isEmpty()) box.setFromObject(house);
   let l = Infinity, r = -Infinity, t = Infinity, bot = -Infinity;
   let i = 0;
@@ -325,7 +342,7 @@ function placeLabels() {
   const shown = [];
   ROOMS.forEach((r, i) => {
     const el = labelEls[i], a = anchors[r.id];
-    if (!a || r.floor > shownUpTo) { el.hidden = true; return; }
+    if (!a || !floorOn(r.floor)) { el.hidden = true; return; }
     a.getWorldPosition(v);
     const side = v.clone().sub(center).setY(0).normalize().dot(camDir);
     if (side < -0.8 && r.id !== 'dome') { el.hidden = true; return; }
@@ -396,5 +413,5 @@ function placeLabels() {
   leads.innerHTML = `<path d="${path}"/>${dots}`;
 }
 
-showFloors(3);
+showFloors(0);
 frame();
