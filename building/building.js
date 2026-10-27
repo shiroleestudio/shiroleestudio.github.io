@@ -200,13 +200,30 @@ let yaw = 0.75, yawVel = 0;             // 처음엔 오른쪽 앞에서 (콘셉
 let pitch = 0.36, pitchVel = 0;         // 위아래 각도. 땅 바로 위 ~ 거의 내려다보기
 const PITCH_MIN = 0.04, PITCH_MAX = 1.0;
 const clampPitch = (p) => Math.min(PITCH_MAX, Math.max(PITCH_MIN, p));
+// 확대·축소: 두 손가락 벌리기/오므리기, 마우스 휠, +/− 버튼
+let lastRR = NaN;
+let userZoom = 1;                       // 거리 배율. 작을수록 가까이
+const ZOOM_MIN = 0.45, ZOOM_MAX = 1.8;
+function zoomBy(f) { userZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, userZoom * f)); dirty = true; }
 let dragging = false, lastX = 0, lastY = 0, moved = 0, downAt = 0;
+const pointers = new Map(); let pinchD = 0;
+const pinchDist = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
 stage.addEventListener('pointerdown', (e) => {
   if (e.target.closest('.callout')) return;
-  dragging = true; lastX = e.clientX; lastY = e.clientY; moved = 0; downAt = performance.now(); yawVel = pitchVel = 0;
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   stage.setPointerCapture(e.pointerId);
+  if (pointers.size === 2) { pinchD = pinchDist(); moved = 99; yawVel = pitchVel = 0; return; }
+  dragging = true; lastX = e.clientX; lastY = e.clientY; moved = 0; downAt = performance.now(); yawVel = pitchVel = 0;
 });
 stage.addEventListener('pointermove', (e) => {
+  if (!pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size >= 2) {
+    const d = pinchDist();
+    if (pinchD > 0 && d > 0) zoomBy(pinchD / d);
+    pinchD = d;
+    return;
+  }
   if (!dragging) return;
   const dx = e.clientX - lastX, dy = e.clientY - lastY;
   lastX = e.clientX; lastY = e.clientY; moved += Math.abs(dx) + Math.abs(dy);
@@ -215,12 +232,25 @@ stage.addEventListener('pointermove', (e) => {
   const np = clampPitch(pitch + dp); pitchVel = np - pitch; pitch = np;
   dirty = true;
 });
+function release(e) {
+  pointers.delete(e.pointerId);
+  if (pointers.size === 1) {          // 두 손가락 중 하나를 떼면 남은 손가락으로 이어서 돌린다
+    const [p] = pointers.values(); lastX = p.x; lastY = p.y; dragging = true; pinchD = 0;
+    return false;
+  }
+  const was = dragging; dragging = false; pinchD = 0;
+  return was;
+}
 stage.addEventListener('pointerup', (e) => {
-  if (!dragging) return;
-  dragging = false;
-  if (moved < 8 && performance.now() - downAt < 400) pick(e);
+  if (!pointers.has(e.pointerId)) return;
+  if (release(e) && moved < 8 && performance.now() - downAt < 400) pick(e);
 });
-stage.addEventListener('pointercancel', () => { dragging = false; });
+stage.addEventListener('pointercancel', release);
+stage.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  zoomBy(Math.exp(e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0015)));
+}, { passive: false });
+for (const b of document.querySelectorAll('[data-zoom]')) b.addEventListener('click', () => zoomBy(b.dataset.zoom === 'in' ? 0.8 : 1.25));
 const ray = new THREE.Raycaster(); const ndc = new THREE.Vector2();
 const wp = new THREE.Vector3();
 function pick(e) {
@@ -262,8 +292,7 @@ function resize() {
   const hfit = Math.atan(Math.tan(hf) * (rowsMode ? 0.92 : w < 760 ? 0.5 : 0.52));
   const vfit = Math.atan(Math.tan(vf) * (rowsMode ? 0.56 : 0.94));
   radius = (fitR / Math.sin(Math.min(vfit, hfit))) * 0.86;
-  camera.far = radius * 3; camera.near = Math.max(0.5, radius * 0.2);
-  post.uniforms.near.value = camera.near; post.uniforms.far.value = camera.far;
+  lastRR = NaN;
   camera.updateProjectionMatrix();
   dirty = true;
 }
@@ -287,7 +316,13 @@ function frame() {
     lastYaw = yaw;
     dirty = false;
     const tgt = new THREE.Vector3(center.x, lookCur, center.z);
-    const rr = radius * zoom;
+    const rr = radius * zoom * userZoom;
+    if (rr !== lastRR) {                // 가까이 가면 앞 클립면도 당긴다
+      lastRR = rr;
+      camera.near = Math.max(0.2, rr * 0.08); camera.far = rr + fitR * 3;
+      post.uniforms.near.value = camera.near; post.uniforms.far.value = camera.far;
+      camera.updateProjectionMatrix();
+    }
     camera.position.set(tgt.x + rr * Math.cos(pitch) * Math.sin(yaw), tgt.y + rr * Math.sin(pitch), tgt.z + rr * Math.cos(pitch) * Math.cos(yaw));
     camera.lookAt(tgt);
     camDir.subVectors(camera.position, tgt).setY(0).normalize();
@@ -375,7 +410,7 @@ function placeLabels() {
     const mid = (hr.l + hr.r) / 2;
     for (const key of ['left', 'right']) {
       const list = shown.filter((it) => (it.ax < mid) === (key === 'left')).sort((p, q) => p.ay - q.ay);
-      const colW = Math.max(64, key === 'left' ? hr.l - GAP - EDGE : b.width - hr.r - GAP - EDGE);
+      const colW = Math.max(150, key === 'left' ? hr.l - GAP - EDGE : b.width - hr.r - GAP - EDGE);
       for (const it of list) { measure(it, Math.min(colW, 220)); it.y = it.ay - it.h / 2; }
       spread(list, 'y', 'h', EDGE, b.height - EDGE, 6);
       // 무대 가장자리에 붙이고 긴 인출선으로 잇는다 (건물과 겹치면 건물 쪽 끝까지만)
