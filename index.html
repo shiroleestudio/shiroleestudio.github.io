@@ -23,85 +23,56 @@
   <link rel="stylesheet" href="building/building.css">
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "이시로스튜디오", "alternateName": ["shiroleestudio", "아기토끼 시로"], "url": "https://shiroleestudio.github.io/", "logo": "https://shiroleestudio.github.io/assets/apple-touch-icon.png", "email": "shiroleestudio@gmail.com", "sameAs": ["https://www.youtube.com/@shiroleebunny", "https://github.com/shiroleestudio"]}</script>
 </head>
-<body>
+<body class="home-page">
 <a class="skip" href="#main">본문으로 건너뛰기</a>
 <header><div class="wrap">
   <a class="brand serif" href="./">이시로스튜디오<small>shiroleestudio · 아기토끼 시로</small></a>
   <nav aria-label="주 메뉴"><a href="works/">만드는 것</a><a href="news/">소식</a><a href="about/">시로 이야기</a><a href="support/">문의</a></nav>
 </div></header>
-<main id="main">
-<section class="wrap house" aria-labelledby="hi">
-  <p class="kw">아기토끼 · 커피 · 우주 · 원목</p>
-  <h1 id="hi">아기토끼 이시로와 함께하는<br>작은 공방입니다.</h1>
-  <p class="lead">1층 찻집, 2층 화실과 공방, 3층 다락의 놀이방과 천문대, 그리고 루프탑. 집을 잡고 돌리면 이쪽 벽이 걷히고, 방에 붙은 이름을 누르면 그 작품으로 들어갑니다.</p>
+<main id="main" class="home">
+<section class="house" aria-labelledby="hi">
+  <h1 id="hi" class="sr">이시로스튜디오: 아기토끼 이시로와 함께하는 작은 공방</h1>
+  <p class="sr">1층 찻집, 2층 화실과 공방, 3층 다락의 놀이방과 천문대, 그리고 루프탑. 방에 붙은 이름을 누르면 그 작품으로 들어갑니다.</p>
   <div class="stage" id="stage">
-    <canvas id="scene" aria-label="시로가 사는 3층 오두막. 가로로 끌어 돌릴 수 있다" role="img"></canvas>
+    <canvas id="scene" aria-label="시로가 사는 3층 오두막. 끌어서 위아래·좌우로 돌릴 수 있다" role="img"></canvas>
     <div class="labels" id="labels"></div>
-    <p class="fallback">이 브라우저에서는 3D 그림을 그릴 수 없어요. 아래 메뉴에서 골라 주세요.</p>
+    <p class="fallback">이 브라우저에서는 3D 그림을 그릴 수 없어요. 아래 목록에서 골라 주세요.</p>
   </div>
-  <div class="floors" role="group" aria-label="보이는 층">
-    <span>층</span>
-    <button type="button" data-floor="1" aria-pressed="false">1층 찻집</button>
-    <button type="button" data-floor="2" aria-pressed="false">2층 갤러리</button>
-    <button type="button" data-floor="3" aria-pressed="true">3층 다락·루프탑</button>
-  </div>
-  <p class="hint">위아래·좌우로 끌어 돌려 보고, 방을 누르면 들어갑니다. 아래에는 같은 것을 글로 적은 메뉴판이 있어요.</p>
-</section>
-
-<section class="wrap feature" aria-labelledby="ft">
-  <a class="shot" href="works/timeline/"><img src="assets/img/timeline-desktop.jpg" width="1280" height="760" alt="거의 모든 것의 타임라인 화면. 한국사·중국사·일본사·세계사 왕조가 한 시간축에 나란히 놓여 있다" loading="lazy"></a>
-  <div>
-    <p class="eyebrow">지금 바로 쓸 수 있어요</p>
-    <h2 id="ft">거의 모든 것의 타임라인</h2>
-    <p>같은 해 한국·중국·일본과 세계에서는 무슨 일이 있었을까요? 왕조와 사건을 한 시간축에 나란히 놓고 손가락으로 확대해 봅니다. 설치 없이 브라우저에서 열리고, 홈 화면에 추가하면 오프라인에서도 돼요.</p>
-    <p><a class="btn fill" href="https://shiroleestudio.github.io/prettymuchtimelines/">열어 보기</a><a class="btn" href="works/timeline/">자세히</a></p>
-  </div>
-</section>
-
-<section class="wrap menu" id="works">
-  <h2>Menu · 만드는 것</h2>
-  <p>모든 작품은 아기토끼·커피·우주 가운데 두 가지 이상을 겹칩니다. 플랫폼별로 나눠 두었어요.</p>
-  <h3 class="pgroup" id="web">웹 서비스</h3>
-  <div class="item"><h3><a href="works/timeline/">거의 모든 것의 타임라인</a></h3><span class="st on">공개</span><p><span class="tag">우주 · 토끼</span> — 한·중·일과 세계 역사를 한 시간축에 놓은 연표 웹앱. 시로가 시대를 안내합니다. <a class="go" href="https://shiroleestudio.github.io/prettymuchtimelines/" rel="noopener">열기</a></p></div>
-  <div class="item"><h3><a href="https://shiroleestudio.github.io/coffee/" rel="noopener">시로의 커피 레시피</a></h3><span class="st on">공개</span><p><span class="tag">커피 · 토끼</span> — 추출 레시피와 타이머. 타이머가 도는 동안 시로가 커피를 내립니다. <a class="go" href="https://shiroleestudio.github.io/coffee/" rel="noopener">열기</a></p></div>
-  <h3 class="pgroup" id="app">앱</h3>
-  <div class="item"><h3>시로 도장 출석부 · iOS</h3><span class="st">준비 중</span><p><span class="tag">커피 · 토끼</span> — 출석하면 커피 스탬프 카드에 시로 도장이 찍히는 iPad·iPhone 출석부. 아이 정보가 들어갈 수 있어 서버로 아무것도 보내지 않아요.</p></div>
-  <h3 class="pgroup" id="game">게임</h3>
-  <div class="item"><h3><a href="works/space-surfer/">스페이스서퍼 달토끼</a></h3><span class="st on">무료 공개</span><p><span class="tag">우주 · 토끼</span> — 당근 로켓을 탄 달토끼가 행성 중력을 타고 나는 한 손가락 퍼즐. <a class="go" href="https://shiroleestudio.itch.io/space-surfer-moon-rabbit" rel="noopener">itch.io에서 바로 하기</a><br><span class="plat">itch.io 무료 웹판 공개 · 안드로이드 준비 중 · iOS·Steam 계획</span></p></div>
-  <h3 class="pgroup" id="video">유튜브</h3>
-  <div class="item"><h3><a href="https://www.youtube.com/@shiroleebunny" rel="noopener">아기토끼 시로 채널</a></h3><span class="st on">운영 중</span><p><span class="tag">토끼 · 커피</span> — 모든 이야기의 출발점. 진짜 시로의 일상과 커피 내리는 순간. <a class="go" href="https://www.youtube.com/@shiroleebunny" rel="noopener">보러 가기</a></p></div>
-</section>
-
-<section class="wrap lab" aria-labelledby="lab">
-  <h2 id="lab">Lab · 실험실</h2>
-  <p>토끼·커피·우주 규칙 밖에서 직접 쓰려고 만든 작은 도구들이에요. 시로의 메뉴에 오르기 전 단계입니다.</p>
-  <div class="item"><h3><a href="https://shiroleestudio.github.io/memobox/" rel="noopener">메모함 · 웹</a></h3><span class="st on">공개</span><p><span class="tag">개인 도구</span> — 떠오른 키워드를 ‘호기심의 방’ 진열장에 표본처럼 놓아 두고, ‘산책’으로 오래 못 본 키워드를 다시 만나는 메모 앱. 기기 안에만 저장돼요. <a class="go" href="https://shiroleestudio.github.io/memobox/" rel="noopener">열기</a></p></div>
-</section>
-
-<section class="wrap two">
-  <div>
-    <h2>News · 소식</h2>
-    <ol class="news"><li><time datetime="2026-10-26">2026.10.26</time><div><h3><a href="https://shiroleestudio.itch.io/space-surfer-moon-rabbit" rel="noopener">스페이스서퍼 달토끼 무료 웹판을 itch.io에 열었어요</a></h3><p>당근 로켓을 탄 달토끼의 한 손가락 중력 퍼즐을 폰·PC 브라우저에서 설치 없이 할 수 있어요. 7장 56단계와 인피니티, 메시에 도감까지 모두 들어 있고 광고는 없습니다.</p></div></li><li><time datetime="2026-10-23">2026.10.23</time><div><h3><a href="works/">커피 레시피·메모함 공개, 스페이스서퍼 미리 해보기</a></h3><p>시로의 커피 레시피와 실험실의 메모함을 바로 쓸 수 있게 열고, 만드는 중인 스페이스서퍼 개발자 버전도 링크했어요.</p></div></li><li><time datetime="2026-10-23">2026.10.23</time><div><h3><a href="./">허브 사이트 문을 열었어요</a></h3><p>시로가 만드는 앱·게임·영상을 한곳에서 볼 수 있는 입구를 열었습니다. 작품별 소개, 개인정보처리방침, 문의 창구를 여기 모아 둡니다.</p></div></li></ol>
-    <p class="more"><a href="news/">소식 전체 보기</a> · <a href="feed.xml">RSS로 받기</a></p>
-  </div>
-  <div>
-    <h2>Story · 시로 이야기</h2>
-    <p class="lead">시로는 진짜 반려 토끼예요. 커피 향 나는 원목 방에서 창밖을 보던 시로를 주인공 삼아, 토끼·커피·우주가 겹치는 것만 만들기로 했습니다.</p>
-    <p class="more"><a href="about/">스튜디오 이야기</a> · <a href="https://www.youtube.com/@shiroleebunny" rel="noopener">시로 영상 보기</a></p>
-    <h2 style="margin-top:28px">Contact · 문의</h2>
-    <p class="lead">버그 신고, 제안, 협업 모두 메일 한 통이면 됩니다.</p>
-    <p class="more"><a href="mailto:shiroleestudio@gmail.com">shiroleestudio@gmail.com</a> · <a href="support/">자주 묻는 질문</a></p>
+  <nav class="rooms" aria-label="시로의 집 방 목록">
+    <h2>시로의 집 방 목록</h2>
+    <h3>1층 찻집</h3>
+    <ul>
+      <li><a href="https://shiroleestudio.github.io/coffee/">찻집 · 커피 레시피</a><small>시로가 커피를 내리는 자리</small></li>
+      <li><a href="support/">카운터 · 문의</a><small>버그 신고, 제안은 여기로</small></li>
+      <li><a href="news/">칠판 · 소식</a><small>오늘의 메뉴처럼 새 소식</small></li>
+    </ul>
+    <h3>2층 갤러리</h3>
+    <ul>
+      <li><a href="works/timeline/">화실 · 타임라인</a><small>벽에 길게 걸린 역사 연표</small></li>
+      <li><a href="works/#lab">공방 · 실험실</a><small>작업대 위의 작은 도구들</small></li>
+      <li><a href="about/">작업 노트 · 시로 이야기</a><small>스튜디오가 생긴 이야기</small></li>
+    </ul>
+    <h3>3층 다락·루프탑</h3>
+    <ul>
+      <li><a href="works/">천문대 · 우주 작품</a><small>지붕 위 돔의 망원경</small></li>
+      <li><a href="works/space-surfer/">놀이방 · 스페이스서퍼</a><small>장난감 로켓과 블록</small></li>
+      <li><a href="https://www.youtube.com/@shiroleebunny">루프탑 · 시로 채널</a><small>밤하늘을 보는 자리</small></li>
+    </ul>
+  </nav>
+  <div class="bar">
+    <div class="floors" role="group" aria-label="보이는 층">
+      <button type="button" data-floor="0" aria-pressed="true">전체</button>
+      <button type="button" data-floor="1" aria-pressed="false">1층</button>
+      <button type="button" data-floor="2" aria-pressed="false">2층</button>
+      <button type="button" data-floor="3" aria-pressed="false">3층</button>
+    </div>
+    <p class="hint">끌어서 돌리고, 이름표를 누르면 들어가요</p>
   </div>
 </section>
 </main>
-<footer><div class="wrap">
-  <div><span class="serif foot-brand">이시로스튜디오</span><br>아기토끼 · 커피 · 우주 · 원목<br>© 2026 SHIROLEESTUDIO</div>
-  <ul class="foot-links">
-    <li><a href="works/">만드는 것</a></li><li><a href="news/">소식</a></li><li><a href="about/">시로 이야기</a></li><li><a href="support/">자주 묻는 질문·문의</a></li><li><a href="privacy/">개인정보처리방침</a></li>
-  </ul>
-  <ul class="foot-links">
-    <li><a href="https://www.youtube.com/@shiroleebunny" rel="noopener">YouTube</a></li><li><a href="https://github.com/shiroleestudio" rel="noopener">GitHub</a></li><li><a href="feed.xml">RSS 소식 받기</a></li><li><a href="mailto:shiroleestudio@gmail.com">shiroleestudio@gmail.com</a></li>
-  </ul>
+<footer class="slim"><div class="wrap">
+  <span>© 2026 SHIROLEESTUDIO</span>
+  <a href="privacy/">개인정보처리방침</a><a href="https://www.youtube.com/@shiroleebunny" rel="noopener">YouTube</a><a href="https://github.com/shiroleestudio" rel="noopener">GitHub</a><a href="feed.xml">RSS</a><a href="mailto:shiroleestudio@gmail.com">메일</a>
 </div></footer>
 <script>
   (function(){ var c=document.createElement('canvas'); var ok=!!(window.WebGLRenderingContext&&(c.getContext('webgl2')||c.getContext('webgl')));
