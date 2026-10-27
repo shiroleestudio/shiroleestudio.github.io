@@ -246,6 +246,8 @@ stage.addEventListener('pointerup', (e) => {
   if (release(e) && moved < 8 && performance.now() - downAt < 400) pick(e);
 });
 stage.addEventListener('pointercancel', release);
+// iOS Safari: 무대 위 두 손가락은 페이지 확대가 아니라 집 확대로
+stage.addEventListener('gesturestart', (e) => e.preventDefault());
 stage.addEventListener('wheel', (e) => {
   e.preventDefault();
   zoomBy(Math.exp(e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0015)));
