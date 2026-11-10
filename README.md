@@ -1,6 +1,6 @@
 # shiroleestudio.github.io
 
-이시로스튜디오(아기토끼 시로) 허브 사이트. GitHub Pages로 루트 주소 https://shiroleestudio.github.io 에 공개된다.
+이시로스튜디오(아기토끼 시로) 허브 사이트. GitHub Pages로 https://shiroleestudio.com 에 공개된다(저장소 `CNAME` 파일이 주소를 정한다. 도메인·DNS 는 `STUDIO.md`).
 
 구성
 
