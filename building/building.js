@@ -16,7 +16,7 @@ const darkQuery = matchMedia('(prefers-color-scheme: dark)');
 
 // 방 ↔ 링크. 위치는 모델의 anchor_<id> 가 정한다.
 const ROOMS = [
-  { id: 'cafe',    floor: 1, name: '찻집 · 커피 레시피',     note: '시로가 커피를 내리는 자리', href: 'https://shiroleestudio.github.io/coffee/' },
+  { id: 'cafe',    floor: 1, name: '찻집 · 커피 레시피',     note: '시로가 커피를 내리는 자리', href: 'https://coffee.shiroleestudio.com/' },
   { id: 'counter', floor: 1, name: '카운터 · 문의',          note: '버그 신고, 제안은 여기로', href: 'support/' },
   { id: 'board',   floor: 1, name: '칠판 · 소식',            note: '오늘의 메뉴처럼 새 소식', href: 'news/' },
   { id: 'atelier', floor: 2, name: '화실 · 타임라인',        note: '벽에 길게 걸린 역사 연표', href: 'works/timeline/' },
