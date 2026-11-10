@@ -17,7 +17,7 @@
 | 허브 | shiroleestudio/shiroleestudio.github.io | https://shiroleestudio.com (www 는 여기로 넘어옴) | main 그대로 Pages |
 | 타임라인 | shiroleestudio/prettymuchtimelines | https://timeline.shiroleestudio.com | 빌드 결과를 커밋, main 그대로 Pages |
 | 커피 레시피 | shiroleestudio/coffee | https://coffee.shiroleestudio.com | Actions 빌드 → Pages |
-| 스페이스서퍼 달토끼 | shiroleestudio/swingby | https://swingby.shiroleestudio.com , itch.io | Actions 빌드 → Pages |
+| 스페이스서퍼 달토끼 | shiroleestudio/swingby | https://spacesurfer.shiroleestudio.com , itch.io | Actions 빌드 → Pages |
 | 메모함 | shiroleestudio/memobox | https://memobox.shiroleestudio.com | main 그대로 Pages |
 | 출석부 | dooholee96-code/choolsukbu | (앱, 사이드로드) | Xcode 로 기기에 설치 |
 
@@ -32,7 +32,7 @@ shiroleestudio.com — Cloudflare Registrar, 스튜디오 Gmail 계정, 2026-11-
 |---|---|---|---|
 | A ×4, AAAA ×4 | @ | GitHub Pages IP (문서 "Managing a custom domain" 의 값) | 허브 |
 | CNAME | www | shiroleestudio.github.io | 허브(루트로 넘어감) |
-| CNAME | timeline, coffee, swingby, memobox | shiroleestudio.github.io | 각 저장소 — 어느 저장소가 받을지는 그 저장소 Settings → Pages 의 Custom domain 이 정한다 |
+| CNAME | timeline, coffee, spacesurfer, memobox | shiroleestudio.github.io | 각 저장소 — 어느 저장소가 받을지는 그 저장소 Settings → Pages 의 Custom domain 이 정한다 |
 | TXT | _github-pages-challenge-shiroleestudio | 조직 Settings → Pages → Verified domains 가 준 값 | 도메인 검증(남이 가져다 붙이는 것 방지) |
 
 - 허브·타임라인·메모함은 저장소의 `CNAME` 파일이 Custom domain 을 정한다(파일을 지우면 github.io 주소로 돌아감).
