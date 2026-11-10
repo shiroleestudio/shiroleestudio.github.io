@@ -1,5 +1,6 @@
 # CHANGELOG
 
+- v0.7.1 (2026-11-10): 앱 링크를 각 앱의 서브도메인으로 — timeline.·coffee.·spacesurfer.·memobox.shiroleestudio.com.
 - v0.7.0 (2026-11-10): 자체 도메인 shiroleestudio.com. `CNAME` 파일, canonical·og·사이트맵·RSS·robots 주소를 새 도메인으로. 앱 링크는 각 앱이 제 서브도메인으로 옮긴 뒤 바꾼다. 도메인·DNS 기록은 STUDIO.md.
 - v0.6.2 (2026-10-27): 배포 직후 새 첫 화면과 옛 스크립트가 섞여 확대 버튼이 먹통이던 것 막기(스크립트·스타일에 버전 꼬리표). iOS Safari 에서 무대 위 두 손가락이 페이지를 확대하지 않게.
 - v0.6.1 (2026-10-27): 시로의 집 확대·축소. 폰은 두 손가락, 데스크톱은 휠, 둘 다 +/− 버튼.
