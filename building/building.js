@@ -48,8 +48,8 @@ sun.position.set(-6, 14, 9);
 // 해 그림자: 집 전체(반지름 약 7m)를 덮는 직교 카메라 하나. 걷어 낸 벽은 그림자도 안 드리운다.
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.left = sun.shadow.camera.bottom = -8;
-sun.shadow.camera.right = sun.shadow.camera.top = 8;
+sun.shadow.camera.left = sun.shadow.camera.bottom = -11;
+sun.shadow.camera.right = sun.shadow.camera.top = 11;
 sun.shadow.camera.near = 2; sun.shadow.camera.far = 40;
 sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.04;
 scene.add(hemi, sun, sun.target);
@@ -69,11 +69,12 @@ const post = new THREE.ShaderMaterial({
     tColor: { value: rtColor.texture }, tDepth: { value: rtColor.depthTexture }, tNormal: { value: rtNormal.texture },
     texel: { value: new THREE.Vector2() }, near: { value: camera.near }, far: { value: camera.far },
     ink: { value: new THREE.Color() }, paper: { value: new THREE.Color() }, line: { value: 1.0 },
+    sky: { value: new THREE.Color() }, night: { value: 0.0 },   // 배경 하늘: 위는 sky, 지평선 쪽은 paper. 밤이면 별
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }',
   fragmentShader: `
-    uniform sampler2D tColor, tDepth, tNormal; uniform vec2 texel; uniform float near, far, line;
-    uniform vec3 ink, paper; varying vec2 vUv;
+    uniform sampler2D tColor, tDepth, tNormal; uniform vec2 texel; uniform float near, far, line, night;
+    uniform vec3 ink, paper, sky; varying vec2 vUv;
     float lin(float z){ return (2.0*near*far)/(far+near-(z*2.0-1.0)*(far-near)); }
     float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }
     vec3 toSRGB(vec3 c){ return pow(max(c, 0.0), vec3(1.0/2.2)); }
@@ -92,7 +93,11 @@ const post = new THREE.ShaderMaterial({
       }
       float edge = clamp(smoothstep(0.06, 0.14, ed) + smoothstep(0.35, 0.7, en), 0.0, 1.0);
       vec4 c = texture2D(tColor, vUv);
-      vec3 col = mix(paper, toSRGB(c.rgb), c.a);
+      // 하늘: 수채처럼 위에서 아래로 번지는 두 색. 밤에는 드문드문 별 (화소마다 고정이라 깜빡이지 않는다)
+      vec3 bg = mix(paper, sky, smoothstep(0.15, 0.95, vUv.y));
+      float star = step(0.9975, hash(floor(gl_FragCoord.xy / 1.5) + 3.0)) * smoothstep(0.3, 0.7, vUv.y);
+      bg += star * night * (0.5 + 0.5 * hash(floor(gl_FragCoord.xy / 1.5) + 9.0)) * vec3(0.9, 0.85, 0.7);
+      vec3 col = mix(bg, toSRGB(c.rgb), c.a);
       col = mix(col, ink, edge * 0.85);
       float g = hash(floor(gl_FragCoord.xy)) * 0.035 - 0.0175;          // 종이 결
       float g2 = hash(floor(gl_FragCoord.xy / 3.0) + 7.0) * 0.025 - 0.0125;
@@ -108,6 +113,8 @@ const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 function applyTheme() {
   const dark = document.documentElement.dataset.theme === 'dark' || (darkQuery.matches && document.documentElement.dataset.theme !== 'light');
   post.uniforms.paper.value.setStyle(css('--paper-2', '#d8d0bb'), THREE.NoColorSpace);
+  post.uniforms.sky.value.setStyle(dark ? '#161c2a' : '#c9d1c6', THREE.NoColorSpace);   // 낮: 옅은 세이지 하늘 · 밤: 먹빛 남색
+  post.uniforms.night.value = dark ? 1 : 0;
   post.uniforms.ink.value.setStyle(dark ? '#1a140f' : '#3a2c22', THREE.NoColorSpace);
   hemi.intensity = dark ? 0.85 : 1.4;
   sun.intensity = dark ? 0.7 : 1.6;
@@ -159,7 +166,9 @@ new GLTFLoader().load(new URL('house.glb', import.meta.url).href, (gltf) => {
     if (o.name.startsWith('anchor_')) anchors[o.name.slice(7)] = o;
   });
   scene.add(house);
-  const box = new THREE.Box3().setFromObject(house);
+  // 화면 맞춤은 집(1~3층)만 — 둘레의 터·언덕(floor 0)은 배경이라 재지 않는다
+  const box = new THREE.Box3();
+  for (const { obj } of floorNodes) box.expandByObject(obj);
   const sph = box.getBoundingSphere(new THREE.Sphere());
   center.copy(sph.center); center.y -= 0.3;
   fitR = sph.radius;

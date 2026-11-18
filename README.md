@@ -32,7 +32,7 @@
 
 ## 시로의 집 (첫 화면의 3D 건물, 파일은 `building/`)
 
-첫 화면의 주인공. 1층 찻집 · 2층 갤러리(화실+공방) · 3층 다락(놀이방·천문대) + 루프탑, 지붕 위 돔에서 망원경이 나온다. 방 라벨이 곧 메뉴다. 같은 방 목록이 `index.html` 안에 글로 있다(평소엔 숨김, 3D 가 안 되면 보임). 방을 바꾸면 `ROOMS` 와 이 목록을 같이 고친다. `building/index.html` 은 첫 화면으로 넘기기만 한다.
+첫 화면의 주인공. 1층 찻집 · 2층 갤러리(화실+공방) · 3층 다락(놀이방·천문대) + 루프탑, 지붕 위 돔에서 망원경이 나온다. 집 둘레는 게임의 한 장면처럼 동네 터(잔디·돌길·말뚝 울타리·나무·가로등·우편함·연못·뒤편 언덕, 모두 `floor 0`)이고, 배경은 셰이더가 그리는 하늘(라이트=낮, 다크=별 뜬 밤)이다. 화면 맞춤은 집(1~3층)만 잰다. 방 라벨이 곧 메뉴다. 같은 방 목록이 `index.html` 안에 글로 있다(평소엔 숨김, 3D 가 안 되면 보임). 방을 바꾸면 `ROOMS` 와 이 목록을 같이 고친다. `building/index.html` 은 첫 화면으로 넘기기만 한다.
 
 - `building/house.glb` — 모델. **손으로 고치지 않는다.** `building/model/build_house.py` 를 고치고 다시 만든다:
   `pip install bpy pillow` (Python 3.11+, Blender 5.x) 후 `python building/model/build_house.py building/house.glb`, 또는 `blender -b -P building/model/build_house.py -- building/house.glb`.
