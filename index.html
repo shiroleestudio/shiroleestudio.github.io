@@ -38,6 +38,10 @@
   <div class="stage" id="stage">
     <canvas id="scene" aria-label="시로가 사는 3층 오두막. 끌어서 위아래·좌우로 돌릴 수 있다" role="img"></canvas>
     <div class="labels" id="labels"></div>
+    <div class="walkpad" id="walkpad" hidden role="group" aria-label="걷기 조작">
+      <button type="button" data-move="f" aria-label="앞으로">▲</button>
+      <div><button type="button" data-move="l" aria-label="왼쪽으로">◀</button><button type="button" data-move="b" aria-label="뒤로">▼</button><button type="button" data-move="r" aria-label="오른쪽으로">▶</button></div>
+    </div>
     <div class="fallback"><img src="building/house.webp" alt="시로의 집 — 1층 찻집, 2층 화실과 공방, 3층 놀이방과 천문대" width="1200" height="703"><p>이 브라우저에서는 3D 그림을 그릴 수 없어요. 아래 목록에서 골라 주세요.</p></div>
   </div>
   <nav class="rooms" aria-label="시로의 집 방 목록">
@@ -72,6 +76,7 @@
       <button type="button" data-zoom="out" aria-label="축소">−</button>
       <button type="button" data-zoom="in" aria-label="확대">+</button>
     </div>
+    <button type="button" class="walk" data-walk aria-pressed="false">걷기</button>
     <p class="hint">끌어서 돌리고, 두 손가락이나 휠로 확대해요</p>
   </div>
 </section>

@@ -213,12 +213,15 @@ for side in 'SNEW':
             window(g, side, o[0], o[1], o[2], o[3])
         else:   # 문
             u0, u1, v0, v1 = o[:4]
-            wbox(g, 'door', side, (u0 + u1) / 2, (v0 + v1) / 2, 0.0, u1 - u0, v1 - v0, 0.1)
+            # 문짝은 따로 둔다('door' 노드): 1인칭으로 다가가면 사이트가 경첩(u1 쪽 모서리)을 축으로 안쪽으로 연다
+            gDoor = group('door', 1)
+            DOOR_HINGE = wpos(side, u1, 0.0, 0.0)
+            wbox(gDoor, 'door', side, (u0 + u1) / 2, (v0 + v1) / 2, 0.0, u1 - u0, v1 - v0, 0.1)
             for uu in (u0 - 0.05, u1 + 0.05):
                 wbox(g, 'wood2', side, uu, (v0 + v1) / 2, 0.02, 0.1, v1 - v0, T + 0.1)
             wbox(g, 'wood2', side, (u0 + u1) / 2, v1 + 0.05, 0.02, u1 - u0 + 0.2, 0.1, T + 0.1)
             wbox(g, 'paper', side, (u0 + u1) / 2, 1.55, 0.1, 0.42, 0.2, 0.03)   # 문패 (글자는 코드로)
-            cyl(g, 'brass', wpos(side, u0 + 0.16, 1.0, 0.09), 0.04, 0.08, axis='Y' if side in 'SN' else 'X', seg=8)
+            cyl(gDoor, 'brass', wpos(side, u0 + 0.16, 1.0, 0.09), 0.04, 0.08, axis='Y' if side in 'SN' else 'X', seg=8)
 
 # 띠보 (층 사이) — 앞뒤 면에 붙여 같이 걷힌다
 for side in 'SNEW':
@@ -670,6 +673,9 @@ for name, g in GROUPS.items():
     ob.data.name = name
     for k, v in g['props'].items():
         ob[k] = v
+    if name == 'door':                 # 원점을 경첩으로 옮겨 사이트가 rotation 만으로 열 수 있게
+        ob.data.transform(Matrix.Translation(-Vector(DOOR_HINGE)))
+        ob.location = DOOR_HINGE
     ob.parent = root
 for a in ANCHORS:
     a.parent = root

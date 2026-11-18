@@ -9,7 +9,19 @@
 .stage.nowebgl ~ .bar,.stage.failed ~ .bar{display:none}
 .home-page header .wrap{padding:12px 0}
 .bar .floors,.bar .hint{margin:0}
-.zoom{display:flex;gap:6px;margin-right:auto}
+.zoom{display:flex;gap:6px}
+.bar .walk{font:inherit;font-size:13px;letter-spacing:.04em;background:transparent;color:var(--ink-2);border:1px solid var(--rule);border-radius:2px;padding:5px 12px;cursor:pointer;margin-right:auto}
+.bar .walk[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.bar .walk:focus-visible,.walkpad button:focus-visible{outline:2px solid var(--mustard);outline-offset:2px}
+.bar button:disabled{opacity:.4;cursor:default}
+/* 1인칭 걷기: 터치용 방향 단추 (마우스·키보드가 있는 기기에선 숨김) */
+.walkpad{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:grid;justify-items:center;gap:4px;pointer-events:auto;touch-action:none}
+.walkpad[hidden]{display:none}
+.walkpad div{display:flex;gap:4px}
+.walkpad button{width:48px;height:44px;font-size:16px;background:var(--paper);color:var(--ink);border:1px solid var(--rule);border-radius:2px;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
+@media(hover:hover) and (pointer:fine){.walkpad{display:none}}
+@media(max-width:519px){.walkpad{left:auto;right:10px;bottom:auto;top:50%;transform:translateY(-50%)}}   /* 좁은 화면: 이름표 띠(위아래)를 피해 오른쪽 가운데 */
+.stage.walking{cursor:crosshair}
 .zoom button{font:inherit;font-size:16px;line-height:1;width:34px;height:31px;background:transparent;color:var(--ink-2);border:1px solid var(--rule);border-radius:2px;cursor:pointer}
 .zoom button:focus-visible{outline:2px solid var(--mustard);outline-offset:2px}
 footer.slim{margin:0;padding:8px 0;background:transparent}

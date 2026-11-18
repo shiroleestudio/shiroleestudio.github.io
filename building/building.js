@@ -3,6 +3,7 @@
 // 모델: house.glb (model/build_house.py 로 Blender 에서 만든다. 콘셉트 그림은 두호의 나노바나나 초안).
 // 그림체: 툰 4단 명암 + 구운 구석 그늘(모델 정점색) + 해 그림자 + 화면 공간 잉크 외곽선 + 종이 결. 색은 모델 재질 색, 배경은 site.css 토큰.
 // 손가락을 따라 상하·좌우로 돈다. 카메라를 향한 벽·지붕은 걷어 낸다(단면). 방 이름표는 건물 밖 양옆에 세우고 인출선으로 잇는다(HTML 링크).
+// '걷기' 단추로 1인칭이 된다: 마당을 걷고 현관으로 1층 찻집에 들어간다 (아래 '1인칭 걷기').
 // 캐릭터는 아직 없다. TODO(character-sheet).
 import * as THREE from 'three';
 import { GLTFLoader } from '../assets/vendor/three/addons/loaders/GLTFLoader.js';
@@ -131,7 +132,7 @@ const anchors = {};
 const pickables = [];
 const center = new THREE.Vector3(0, 4.2, 0);
 let radius = 26, fitR = 6, rowsMode = false;
-let house = null;
+let house = null, door = null;   // door: 현관 문짝 (원점이 경첩, 걷기 모드에서 연다)
 let dirty = true;
 
 const toonCache = new Map();
@@ -164,6 +165,7 @@ new GLTFLoader().load(new URL('house.glb', import.meta.url).href, (gltf) => {
     if (typeof ud.floor === 'number' && ud.floor > 0) floorNodes.push({ obj: o, floor: ud.floor });
     if (ud.floor === 0) baseNodes.push(o);
     if (o.name.startsWith('anchor_')) anchors[o.name.slice(7)] = o;
+    if (o.name === 'door') door = o;
   });
   scene.add(house);
   // 화면 맞춤은 집(1~3층)만 — 둘레의 터·언덕(floor 0)은 배경이라 재지 않는다
@@ -233,7 +235,7 @@ let dragging = false, lastX = 0, lastY = 0, moved = 0, downAt = 0;
 const pointers = new Map(); let pinchD = 0;
 const pinchDist = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
 stage.addEventListener('pointerdown', (e) => {
-  if (e.target.closest('.callout')) return;
+  if (e.target.closest('.callout, .walkpad')) return;
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   stage.setPointerCapture(e.pointerId);
   if (pointers.size === 2) { pinchD = pinchDist(); moved = 99; yawVel = pitchVel = 0; return; }
@@ -244,13 +246,16 @@ stage.addEventListener('pointermove', (e) => {
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (pointers.size >= 2) {
     const d = pinchDist();
-    if (pinchD > 0 && d > 0) zoomBy(pinchD / d);
+    if (pinchD > 0 && d > 0 && !walking) zoomBy(pinchD / d);
     pinchD = d;
     return;
   }
   if (!dragging) return;
   const dx = e.clientX - lastX, dy = e.clientY - lastY;
   lastX = e.clientX; lastY = e.clientY; moved += Math.abs(dx) + Math.abs(dy);
+  if (walking) {                       // 1인칭: 끌면 고개를 돌린다
+    wYaw -= dx * 0.004; wPitch = Math.min(1.1, Math.max(-1.1, wPitch - dy * 0.003)); dirty = true; return;
+  }
   const d = -dx * 0.008, dp = dy * 0.006;
   yaw += d; yawVel = d;
   const np = clampPitch(pitch + dp); pitchVel = np - pitch; pitch = np;
@@ -274,6 +279,7 @@ stage.addEventListener('pointercancel', release);
 stage.addEventListener('gesturestart', (e) => e.preventDefault());
 stage.addEventListener('wheel', (e) => {
   e.preventDefault();
+  if (walking) return;
   zoomBy(Math.exp(e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0015)));
 }, { passive: false });
 for (const b of document.querySelectorAll('[data-zoom]')) b.addEventListener('click', () => zoomBy(b.dataset.zoom === 'in' ? 0.8 : 1.25));
@@ -330,8 +336,11 @@ applyTheme();
 const camDir = new THREE.Vector3(); const v = new THREE.Vector3();
 let lastYaw = NaN;
 let lookCur = center.y;
+let lastT = performance.now();
 function frame() {
-  if (!dragging) {
+  const now = performance.now(); const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+  if (walking) walkStep(dt);
+  else if (!dragging) {
     if (Math.abs(yawVel) > 0.0003) { yaw += yawVel; yawVel *= 0.92; dirty = true; }
     else if (!reduceMotion.matches && house) { yaw += 0.0011; dirty = true; }
     if (Math.abs(pitchVel) > 0.0003) { pitch = clampPitch(pitch + pitchVel); pitchVel *= 0.9; dirty = true; }
@@ -349,12 +358,18 @@ function frame() {
       post.uniforms.near.value = camera.near; post.uniforms.far.value = camera.far;
       camera.updateProjectionMatrix();
     }
-    camera.position.set(tgt.x + rr * Math.cos(pitch) * Math.sin(yaw), tgt.y + rr * Math.sin(pitch), tgt.z + rr * Math.cos(pitch) * Math.cos(yaw));
-    camera.lookAt(tgt);
-    camDir.subVectors(camera.position, tgt).setY(0).normalize();
+    if (walking) {                    // 1인칭: 눈높이에서 보는 방향대로. 벽은 걷어 내지 않는다
+      camera.position.set(player.x, EYE, player.z);
+      camera.rotation.set(wPitch, wYaw, 0);
+      camDir.set(-Math.sin(wYaw), 0, -Math.cos(wYaw));
+    } else {
+      camera.position.set(tgt.x + rr * Math.cos(pitch) * Math.sin(yaw), tgt.y + rr * Math.sin(pitch), tgt.z + rr * Math.cos(pitch) * Math.cos(yaw));
+      camera.lookAt(tgt);
+      camDir.subVectors(camera.position, tgt).setY(0).normalize();
+    }
 
     for (const { obj, floor } of floorNodes) obj.visible = floorOn(floor);
-    for (const { obj, dir } of cuttables) if (obj.visible) obj.visible = dir.dot(camDir) < 0.3;
+    for (const { obj, dir } of cuttables) if (obj.visible) obj.visible = walking || dir.dot(camDir) < 0.3;
 
     // 1) 색 2) 법선 3) 외곽선·종이 결
     renderer.setRenderTarget(rtColor); renderer.clear(); renderer.render(scene, camera);
@@ -366,6 +381,78 @@ function frame() {
     placeLabels();
   }
   requestAnimationFrame(frame);
+}
+
+// ---- 1인칭 걷기 (두호 2026-11-18: 남코뮤지엄처럼 들어가 보기) ----
+// '걷기' 단추로 켠다. 울타리 문 앞에서 시작해 마당을 걷고, 현관으로 1층 찻집에 들어간다 (계단은 없다).
+// 키보드 WASD·방향키, 터치는 화면의 방향 단추. 끌면 고개를 돌린다. Esc 또는 단추로 나온다.
+// three 좌표: 모델의 남쪽(정문)이 +z. 집 발자국 ±3 × ±2.5, 현관은 x 0.35~1.25 의 남쪽 벽.
+const walkBtn = document.querySelector('[data-walk]');
+const walkPad = document.getElementById('walkpad');
+const hintEl = document.querySelector('.bar .hint');
+const hintOrbit = hintEl ? hintEl.textContent : '';
+let walking = false;
+const player = new THREE.Vector3(0.8, 0, 6.6);   // 울타리 문 앞, 돌길 끝
+let wYaw = 0, wPitch = 0;                         // yaw 0 = 북쪽(집) 을 본다
+const EYE = 1.45, SPEED = 2.4;                    // 눈높이(m), 걸음(m/s)
+const keys = new Set();
+const TREES = [[-6.5, 4.5], [-7, -3.5], [6.8, -4.5], [7.2, 3.8], [-3.5, -6], [4, -6.3], [-8.3, 0.5], [8.4, -0.8], [-5.5, 6.5], [5.8, 6.4], [1.7, 5.1]];
+function blocked(x, z) {
+  if (Math.abs(x) > 8.2 || Math.abs(z) > 6.7) return true;                       // 울타리
+  const inside = Math.abs(x) < 2.7 && Math.abs(z) < 2.2;
+  const wall = !inside && Math.abs(x) < 3.35 && Math.abs(z) < 2.85;
+  const door = x > 0.3 && x < 1.3 && z > 1.8;
+  if (wall && !door) return true;
+  if (Math.hypot((x + 5.2) / 1.7, (z + 2.0) / 1.3) < 1) return true;             // 연못
+  for (const [tx, tz] of TREES) if (Math.hypot(x - tx, z - tz) < 0.45) return true;
+  return false;
+}
+function walkStep(dt) {
+  if (door) {                                                                  // 현관 앞 1.8 m 안이면 문이 안쪽으로 열린다
+    const want = Math.hypot(player.x - door.position.x, player.z - door.position.z) < 1.8 ? -1.7 : 0;
+    const ry = door.rotation.y + (want - door.rotation.y) * Math.min(1, dt * 6);
+    if (Math.abs(ry - door.rotation.y) > 0.0005) { door.rotation.y = ry; dirty = true; }
+  }
+  let f = 0, r = 0;
+  if (keys.has('f')) f += 1; if (keys.has('b')) f -= 1; if (keys.has('r')) r += 1; if (keys.has('l')) r -= 1;
+  if (!f && !r) return;
+  const len = Math.hypot(f, r); f /= len; r /= len;
+  const sy = Math.sin(wYaw), cy = Math.cos(wYaw);
+  const dx = (-sy * f + cy * r) * SPEED * dt, dz = (-cy * f - sy * r) * SPEED * dt;
+  if (!blocked(player.x + dx, player.z + dz)) { player.x += dx; player.z += dz; }
+  else if (!blocked(player.x + dx, player.z)) player.x += dx;                      // 벽을 따라 미끄러진다
+  else if (!blocked(player.x, player.z + dz)) player.z += dz;
+  dirty = true;
+}
+function setWalking(on) {
+  walking = on;
+  if (on) { showFloors(0); player.set(0.8, 0, 6.6); wYaw = 0; wPitch = 0.05; }
+  else if (door) door.rotation.y = 0;
+  for (const b of floorButtons) b.disabled = on;
+  for (const b of document.querySelectorAll('[data-zoom]')) b.disabled = on;
+  if (walkBtn) walkBtn.setAttribute('aria-pressed', String(on));
+  if (walkPad) walkPad.hidden = !on;
+  if (hintEl) hintEl.textContent = on ? '방향키·WASD 로 걷고, 끌어서 둘러봐요. 현관으로 들어갈 수 있어요' : hintOrbit;
+  stage.classList.toggle('walking', on);
+  camera.fov = on ? 62 : 28;
+  if (on) { camera.near = 0.1; camera.far = 80; post.uniforms.near.value = 0.1; post.uniforms.far.value = 80; }
+  lastRR = NaN; keys.clear();
+  camera.updateProjectionMatrix();
+  dirty = true;
+}
+if (walkBtn) walkBtn.addEventListener('click', () => setWalking(!walking));
+const KEYMAP = { KeyW: 'f', ArrowUp: 'f', KeyS: 'b', ArrowDown: 'b', KeyA: 'l', ArrowLeft: 'l', KeyD: 'r', ArrowRight: 'r' };
+addEventListener('keydown', (e) => {
+  if (!walking || e.target.closest('input, textarea')) return;
+  if (e.code === 'Escape') { setWalking(false); return; }
+  if (KEYMAP[e.code]) { keys.add(KEYMAP[e.code]); e.preventDefault(); }
+});
+addEventListener('keyup', (e) => { if (KEYMAP[e.code]) keys.delete(KEYMAP[e.code]); });
+addEventListener('blur', () => keys.clear());
+if (walkPad) for (const b of walkPad.querySelectorAll('[data-move]')) {
+  const on = (e) => { e.preventDefault(); keys.add(b.dataset.move); };
+  const off = () => keys.delete(b.dataset.move);
+  b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('pointerleave', off);
 }
 
 // 라벨: 건물 밖 양옆 칸에 세우고, 방까지 인출선으로 잇는다 (도감처럼)
@@ -405,10 +492,10 @@ function placeLabels() {
     const el = labelEls[i], a = anchors[r.id];
     if (!a || !floorOn(r.floor)) { el.hidden = true; return; }
     a.getWorldPosition(v);
-    const side = v.clone().sub(center).setY(0).normalize().dot(camDir);
+    const side = walking ? 1 : v.clone().sub(center).setY(0).normalize().dot(camDir);
     if (side < -0.8 && r.id !== 'dome') { el.hidden = true; return; }
     v.project(camera);
-    if (v.z > 1) { el.hidden = true; return; }
+    if (v.z > 1 || (walking && (Math.abs(v.x) > 1 || Math.abs(v.y) > 1))) { el.hidden = true; return; }   // 걷는 중엔 보이는 방만
     el.hidden = false;
     shown.push({ el, ax: (v.x * 0.5 + 0.5) * b.width, ay: (-v.y * 0.5 + 0.5) * b.height });
   });
