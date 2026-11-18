@@ -48,7 +48,8 @@ shiroleestudio.com — Cloudflare Registrar, 스튜디오 Gmail 계정, 2026-11-
 | shiroleestudio@gmail.com | 문의·스토어·광고 계정의 기준 메일 | 2FA 와 복구 코드를 종이에 보관 |
 | itch.io | 게임 웹판 배포 | 위 Gmail 로 가입 |
 | Cloudflare (스튜디오 Gmail) | 도메인 shiroleestudio.com 등록·DNS | 2FA 켬. 결제 수단 유효기간을 갱신 전에 확인 |
-| 아직 없음 | Google Play Console, AdMob, AdSense, Apple Developer | 명의가 정해진 뒤 만든다 |
+| Google AdSense | 웹 광고(연표 글 페이지부터) | 2026-11-18 가입, 사이트 shiroleestudio.com(서브도메인 포함), 게시자 ID pub-8077516962923071 → 루트 `ads.txt`. 자동 광고는 끈다 |
+| 아직 없음 | Google Play Console, AdMob, Apple Developer | 명의가 정해진 뒤 만든다 |
 
 ## 정기 점검
 
