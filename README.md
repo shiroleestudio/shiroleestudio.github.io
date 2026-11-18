@@ -35,9 +35,12 @@
 첫 화면의 주인공. 1층 찻집 · 2층 갤러리(화실+공방) · 3층 다락(놀이방·천문대) + 루프탑, 지붕 위 돔에서 망원경이 나온다. 방 라벨이 곧 메뉴다. 같은 방 목록이 `index.html` 안에 글로 있다(평소엔 숨김, 3D 가 안 되면 보임). 방을 바꾸면 `ROOMS` 와 이 목록을 같이 고친다. `building/index.html` 은 첫 화면으로 넘기기만 한다.
 
 - `building/house.glb` — 모델. **손으로 고치지 않는다.** `building/model/build_house.py` 를 고치고 다시 만든다:
-  `pip install bpy` (Python 3.11) 후 `python building/model/build_house.py building/house.glb`, 또는 `blender -b -P building/model/build_house.py -- building/house.glb`.
+  `pip install bpy pillow` (Python 3.11+, Blender 5.x) 후 `python building/model/build_house.py building/house.glb`, 또는 `blender -b -P building/model/build_house.py -- building/house.glb`.
+  스크립트가 모양을 쌓은 뒤 ① 큰 면을 잘게 나누고 구석 그늘(AO)을 광선으로 재어 정점색 `COLOR_0` 에 굽고, ② `building/model/textures.py` 가 그린 나뭇결·지붕널·회벽·돌·풀 텍스처(WebP, 1 타일 = 1 m)를 상자 투영 UV 로 입힌다. 법선은 넣지 않는다(면이 평평해 사이트가 계산해도 같다, 용량 25% 절약). 결과는 약 1.9 MB.
+  손그림 텍스처가 생기면 `textures.py` 의 `RECIPES` 에서 그 그림 파일로 바꿔 끼운다.
+- `building/house.webp` + `assets/og.png` — 정지 그림. 3D 가 안 되는 기기와 공유 미리보기에 쓴다. 모델·그림체가 바뀌면 `building/model/still.js`(playwright 필요, 선택 도구)로 다시 찍는다.
 - 모델과 코드의 약속: 노드 extras 의 `floor`(층)·`cut`(S/N/E/W, 카메라가 그쪽이면 걷어 냄), 빈 객체 `anchor_<방id>`(라벨 자리), 재질 이름 `glow*`(불 켜진 창).
-- `building/building.js` — 회전·단면·층 고르기·라벨·그림체(툰 3단 명암 + 화면 공간 잉크 외곽선 + 종이 결). 방과 링크는 맨 위 `ROOMS`(사이트 뿌리 기준 경로). 작품이 늘면 `ROOMS` 와 첫 화면의 방 목록을 같이 고친다.
+- `building/building.js` — 회전·단면·층 고르기·라벨·그림체(툰 4단 명암 + 구운 구석 그늘 + 해 그림자맵 2048 + 4x MSAA + 화면 공간 잉크 외곽선 + 종이 결). 방과 링크는 맨 위 `ROOMS`(사이트 뿌리 기준 경로). 작품이 늘면 `ROOMS` 와 첫 화면의 방 목록을 같이 고친다.
 - 콘셉트 그림(나노바나나 초안)은 저장소 밖 프로젝트 폴더에 있다. AI 초안이라 사이트에 올리지 않는다.
 - 캐릭터(시로·카피바라씨·코알라씨)는 캐릭터 시트 뒤에 넣는다. `TODO(character-sheet)`.
 - `index.html` 은 `building.css`·`building.js` 에 `?v=버전` 을 붙인다. GitHub Pages 는 파일마다 10분 캐시라 새 HTML 과 옛 JS 가 섞이면 새 버튼이 먹통이 된다. 이 두 파일을 고치면 `?v=` 를 릴리스 번호로 올린다.

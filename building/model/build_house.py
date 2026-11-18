@@ -1,6 +1,6 @@
 # 시로의 집 — Blender 모델 생성 스크립트 (Blender 5.0, bpy)
 # 콘셉트: /mnt/project-files/hub/concept/ (두호 2026-10-26, 나노바나나 초안)
-# 실행:  python build_house.py <out.glb>      (pip 의 bpy 모듈) 또는
+# 실행:  python build_house.py <out.glb>      (pip 의 bpy 모듈, Blender 5.x) 또는
 #        blender -b -P build_house.py -- <out.glb>
 # 좌표: Blender X=가로(오른쪽 +), Y=깊이(정면 -Y), Z=위. glTF 로 내보내면 three.js 에서 정면이 +Z.
 #
@@ -625,9 +625,140 @@ for name, g in GROUPS.items():
 for a in ANCHORS:
     a.parent = root
 
+
+# ---------------------------------------------------------------- 구석 그늘(AO) 굽기 → 정점색 COLOR_0
+# 콘솔 게임이 조명을 미리 구워 두듯, 구석이 어두워지는 정도를 정점마다 계산해 glb 에 넣는다.
+# 사이트(building.js)는 이 색을 재질 색에 곱하기만 하므로 런타임 비용이 없다. Cycles 없이 BVH 광선만 쓴다.
+# 큰 면은 정점이 모서리에만 있어 그늘이 밋밋하므로 먼저 AO_EDGE 길이로 잘게 나눈다(삼각형 수가 몇 배 는다).
+from mathutils.bvhtree import BVHTree
+import random
+
+AO_EDGE = 0.45        # 이 길이보다 긴 변은 나눈다 (m)
+AO_RAYS = 40          # 정점당 광선 수
+AO_DIST = 1.3         # 이 거리 안의 물체만 그늘을 만든다 (m)
+AO_FLOOR = 0.5        # 가장 어두운 구석의 밝기 (0=검정)
+AO_TINT = (0.82, 0.70, 0.60)   # 그늘 색 (따뜻한 갈색; 회색 그늘은 '3D 렌더' 느낌)
+
+def _subdivide_long(me):
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    for _ in range(4):                     # 한 번에 1/2 씩, 최대 4번
+        long_edges = [e for e in bm.edges if e.calc_length() > AO_EDGE * 1.5]
+        if not long_edges:
+            break
+        bmesh.ops.subdivide_edges(bm, edges=long_edges, cuts=1, use_grid_fill=True)
+    bm.to_mesh(me)
+    bm.free()
+
+def bake_ao(objs):
+    meshes = [o for o in objs if o.type == 'MESH']
+    for o in meshes:
+        _subdivide_long(o.data)
+    # 모든 메시를 세계 좌표의 한 BVH 로
+    verts, polys = [], []
+    for o in meshes:
+        base = len(verts)
+        M = o.matrix_world
+        verts.extend([M @ v.co for v in o.data.vertices])
+        polys.extend([[base + i for i in p.vertices] for p in o.data.polygons])
+    tree = BVHTree.FromPolygons(verts, polys)
+    rng = random.Random(7)
+    # 반구 안의 고정 방향 묶음 (코사인 가중)
+    dirs = []
+    for _ in range(AO_RAYS):
+        u, v = rng.random(), rng.random()
+        r = math.sqrt(u); phi = 2 * math.pi * v
+        dirs.append(Vector((r * math.cos(phi), r * math.sin(phi), math.sqrt(max(0.0, 1 - u)))))
+    for o in meshes:
+        me = o.data
+        glow = all(m.name.startswith('glow') for m in me.materials if m)
+        col = me.color_attributes.new('ao', 'BYTE_COLOR', 'CORNER')   # 바이트면 glb 가 1/4
+        me.color_attributes.active_color = col
+        M = o.matrix_world
+        cache = {}
+        for p in me.polygons:
+            n = (M.to_3x3() @ p.normal).normalized()
+            # 면 법선 주변의 기저
+            a = Vector((1, 0, 0)) if abs(n.x) < 0.9 else Vector((0, 1, 0))
+            t = n.cross(a).normalized(); b = n.cross(t)
+            pc = M @ p.center
+            for li in p.loop_indices:
+                vi = me.loops[li].vertex_index
+                key = (vi, round(n.x, 2), round(n.y, 2), round(n.z, 2))
+                if key not in cache:
+                    if glow:
+                        cache[key] = 1.0
+                    else:
+                        wp = M @ me.vertices[vi].co
+                        origin = wp + (pc - wp) * 0.08 + n * 0.015    # 모서리에서 살짝 안쪽·위쪽
+                        occ = 0.0
+                        for d in dirs:
+                            wd = t * d.x + b * d.y + n * d.z
+                            hit = tree.ray_cast(origin, wd, AO_DIST)
+                            if hit[0] is not None:
+                                occ += 1.0 - hit[3] / AO_DIST
+                        cache[key] = 1.0 - occ / AO_RAYS
+                ao = cache[key]
+                # 밝은 곳은 흰색(원래 색 그대로), 가장 어두운 구석은 AO_TINT * AO_FLOOR
+                col.data[li].color_srgb = tuple(c * AO_FLOOR + (1 - c * AO_FLOOR) * ao for c in AO_TINT) + (1.0,)
+
+bake_ao([o for o in bpy.data.objects if o.type == 'MESH'])
+
+# ---------------------------------------------------------------- 텍스처 + UV (상자 투영)
+# textures.py 가 나뭇결·지붕널·회벽·돌·풀을 그린다. UV 는 세계 좌표를 면의 주 법선 축으로 투영(1 타일 = 1 m × 타일/m).
+import os
+import tempfile
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import textures
+
+TEX_DIR = tempfile.mkdtemp(prefix='house_tex_')
+TEX = textures.make_all({k: COL[k] for k in textures.RECIPES if k in COL}, TEX_DIR)
+
+def texture_materials():
+    for key, (path, tiles, swap) in TEX.items():
+        m = MATS.get(key)
+        if m is None:
+            continue
+        nt = m.node_tree
+        bsdf = nt.nodes.get('Principled BSDF')
+        img = bpy.data.images.load(path)
+        img.name = key
+        img.pack()
+        tex = nt.nodes.new('ShaderNodeTexImage')
+        tex.image = img
+        nt.links.new(tex.outputs['Color'], bsdf.inputs['Base Color'])
+
+def project_uvs(objs):
+    for o in objs:
+        if o.type != 'MESH':
+            continue
+        me = o.data
+        uv = me.uv_layers.new(name='UVMap')
+        M = o.matrix_world
+        for p in me.polygons:
+            key = me.materials[p.material_index].name if me.materials and me.materials[p.material_index] else ''
+            tiles, swap = (TEX[key][1], TEX[key][2]) if key in TEX else (1.0, False)
+            n = (M.to_3x3() @ p.normal)
+            ax = max(range(3), key=lambda i: abs(n[i]))
+            for li in p.loop_indices:
+                w = M @ me.vertices[me.loops[li].vertex_index].co
+                if ax == 2:        # 위·아래 면: x,y
+                    u, v = w.x, w.y
+                elif ax == 0:      # 동·서 면: y,z
+                    u, v = w.y, w.z
+                else:              # 남·북 면: x,z
+                    u, v = w.x, w.z
+                if swap and ax != 2:
+                    u, v = v, u
+                uv.data[li].uv = (u * tiles, v * tiles)
+
+texture_materials()
+project_uvs([o for o in bpy.data.objects if o.type == 'MESH'])
+
 out = sys.argv[-1] if sys.argv[-1].endswith('.glb') else 'house.glb'
 bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', export_extras=True, export_apply=True,
-                          export_yup=True, export_materials='EXPORT', export_normals=True,
-                          use_selection=False)
+                          export_yup=True, export_materials='EXPORT', export_normals=False,   # 면이 평평해 법선은 GLTFLoader 가 계산해도 같다 (glb 25% 절약)
+                          use_selection=False, export_vertex_color='ACTIVE', export_all_vertex_colors=False,
+                          export_image_format='WEBP', export_image_quality=80)
 tris = sum(len(o.data.polygons) for o in bpy.data.objects if o.type == 'MESH')
 print('EXPORTED', out, 'groups', len(GROUPS), 'faces', tris)

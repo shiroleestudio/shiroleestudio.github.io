@@ -1,7 +1,7 @@
 // 시로의 집 — 3D 건물 (2026-10-26)
 // 허브 첫 화면(/)의 주인공. 1층 찻집 · 2층 갤러리(화실+공방) · 3층 다락(놀이방·천문대) + 루프탑. 지붕 위 돔에서 망원경이 나온다.
 // 모델: house.glb (model/build_house.py 로 Blender 에서 만든다. 콘셉트 그림은 두호의 나노바나나 초안).
-// 그림체: 툰 3단 명암 + 화면 공간 잉크 외곽선 + 종이 결. 색은 모델 재질 색, 배경은 site.css 토큰.
+// 그림체: 툰 4단 명암 + 구운 구석 그늘(모델 정점색) + 해 그림자 + 화면 공간 잉크 외곽선 + 종이 결. 색은 모델 재질 색, 배경은 site.css 토큰.
 // 손가락을 따라 상하·좌우로 돈다. 카메라를 향한 벽·지붕은 걷어 낸다(단면). 방 이름표는 건물 밖 양옆에 세우고 인출선으로 잇는다(HTML 링크).
 // 캐릭터는 아직 없다. TODO(character-sheet).
 import * as THREE from 'three';
@@ -37,21 +37,30 @@ const css = (name, fb) => getComputedStyle(document.documentElement).getProperty
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setClearColor(0x000000, 0);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(28, 1, 0.5, 200);
 
 const hemi = new THREE.HemisphereLight(0xfff6e4, 0x9c8a72, 1.4);
 const sun = new THREE.DirectionalLight(0xfff0d8, 1.6);
 sun.position.set(-6, 14, 9);
-scene.add(hemi, sun);
+// 해 그림자: 집 전체(반지름 약 7m)를 덮는 직교 카메라 하나. 걷어 낸 벽은 그림자도 안 드리운다.
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = sun.shadow.camera.bottom = -8;
+sun.shadow.camera.right = sun.shadow.camera.top = 8;
+sun.shadow.camera.near = 2; sun.shadow.camera.far = 40;
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.04;
+scene.add(hemi, sun, sun.target);
 
-// 3단 톤 — 수채 그림처럼 명암을 끊는다
-const tone = new THREE.DataTexture(new Uint8Array([150, 150, 150, 255, 205, 205, 205, 255, 255, 255, 255, 255]), 3, 1);
+// 4단 톤 — 수채 그림처럼 명암을 끊는다 (구석 그늘은 모델 정점색이, 해 그림자는 그림자맵이 더한다)
+const tone = new THREE.DataTexture(new Uint8Array([138, 138, 138, 255, 178, 178, 178, 255, 218, 218, 218, 255, 255, 255, 255, 255]), 4, 1);
 tone.minFilter = tone.magFilter = THREE.NearestFilter;
 tone.needsUpdate = true;
 
 // ---- 외곽선 + 종이 결 (화면 공간 후처리) ----
-const rtColor = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType });
+const rtColor = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });   // 4x MSAA (WebGL2)
 rtColor.depthTexture = new THREE.DepthTexture(1, 1);
 const rtNormal = new THREE.WebGLRenderTarget(1, 1);
 const normalMat = new THREE.MeshNormalMaterial();
@@ -119,10 +128,12 @@ let house = null;
 let dirty = true;
 
 const toonCache = new Map();
-function toonize(m) {
+function toonize(m, vc) {
   if (m.name.startsWith('glow')) return new THREE.MeshBasicMaterial({ color: m.color });
-  const key = m.color.getHexString();
-  if (!toonCache.has(key)) toonCache.set(key, new THREE.MeshToonMaterial({ color: m.color, gradientMap: tone }));
+  const key = m.name + (vc ? '+vc' : '');
+  // map: 모델에 든 생성 텍스처(나뭇결·지붕널·회벽…). vertexColors: 구워 둔 구석 그늘(COLOR_0)을 곱한다 (없는 메시는 재질 색만)
+  if (m.map) m.map.anisotropy = renderer.capabilities.getMaxAnisotropy();   // 비스듬한 바닥·지붕에서도 결이 뭉개지지 않게
+  if (!toonCache.has(key)) toonCache.set(key, new THREE.MeshToonMaterial({ color: m.color, map: m.map || null, gradientMap: tone, vertexColors: vc }));
   return toonCache.get(key);
 }
 
@@ -135,7 +146,10 @@ new GLTFLoader().load(new URL('house.glb', import.meta.url).href, (gltf) => {
   house = gltf.scene;
   house.traverse((o) => {
     if (o.isMesh) {
-      o.material = Array.isArray(o.material) ? o.material.map(toonize) : toonize(o.material);
+      if (!o.geometry.getAttribute('normal')) o.geometry.computeVertexNormals();   // glb 에 법선을 안 넣는다 (면이 평평해 계산값이 같다)
+      const vc = !!o.geometry.getAttribute('color');
+      o.material = Array.isArray(o.material) ? o.material.map((m) => toonize(m, vc)) : toonize(o.material, vc);
+      o.castShadow = o.receiveShadow = true;
       pickables.push(o);
     }
     const ud = o.userData || {};
@@ -149,6 +163,7 @@ new GLTFLoader().load(new URL('house.glb', import.meta.url).href, (gltf) => {
   const sph = box.getBoundingSphere(new THREE.Sphere());
   center.copy(sph.center); center.y -= 0.3;
   fitR = sph.radius;
+  sun.target.position.set(center.x, 0, center.z);
   targetY = lookCur = center.y;
   showFloors(shownFloor);
   loading.remove();
