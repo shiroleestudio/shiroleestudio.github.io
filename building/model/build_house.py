@@ -1,6 +1,6 @@
 # 시로의 집 — Blender 모델 생성 스크립트 (Blender 5.0, bpy)
 # 콘셉트: /mnt/project-files/hub/concept/ (두호 2026-10-26, 나노바나나 초안)
-# 실행:  python build_house.py <out.glb>      (pip 의 bpy 모듈) 또는
+# 실행:  python build_house.py <out.glb>      (pip 의 bpy 모듈, Blender 5.x) 또는
 #        blender -b -P build_house.py -- <out.glb>
 # 좌표: Blender X=가로(오른쪽 +), Y=깊이(정면 -Y), Z=위. glTF 로 내보내면 three.js 에서 정면이 +Z.
 #
@@ -10,6 +10,7 @@
 #  - 재질 이름 glow*: 불 켜진 창·전구 (조명 없이 그 색 그대로).
 # 캐릭터(시로·카피바라씨·코알라씨)는 넣지 않는다. TODO(character-sheet).
 import math
+import random
 import sys
 
 import bpy  # bpy 를 먼저 (pip bpy 모듈에서는 bmesh 가 bpy 뒤에 생긴다)
@@ -212,12 +213,15 @@ for side in 'SNEW':
             window(g, side, o[0], o[1], o[2], o[3])
         else:   # 문
             u0, u1, v0, v1 = o[:4]
-            wbox(g, 'door', side, (u0 + u1) / 2, (v0 + v1) / 2, 0.0, u1 - u0, v1 - v0, 0.1)
+            # 문짝은 따로 둔다('door' 노드): 1인칭으로 다가가면 사이트가 경첩(u1 쪽 모서리)을 축으로 안쪽으로 연다
+            gDoor = group('door', 1)
+            DOOR_HINGE = wpos(side, u1, 0.0, 0.0)
+            wbox(gDoor, 'door', side, (u0 + u1) / 2, (v0 + v1) / 2, 0.0, u1 - u0, v1 - v0, 0.1)
             for uu in (u0 - 0.05, u1 + 0.05):
                 wbox(g, 'wood2', side, uu, (v0 + v1) / 2, 0.02, 0.1, v1 - v0, T + 0.1)
             wbox(g, 'wood2', side, (u0 + u1) / 2, v1 + 0.05, 0.02, u1 - u0 + 0.2, 0.1, T + 0.1)
             wbox(g, 'paper', side, (u0 + u1) / 2, 1.55, 0.1, 0.42, 0.2, 0.03)   # 문패 (글자는 코드로)
-            cyl(g, 'brass', wpos(side, u0 + 0.16, 1.0, 0.09), 0.04, 0.08, axis='Y' if side in 'SN' else 'X', seg=8)
+            cyl(gDoor, 'brass', wpos(side, u0 + 0.16, 1.0, 0.09), 0.04, 0.08, axis='Y' if side in 'SN' else 'X', seg=8)
 
 # 띠보 (층 사이) — 앞뒤 면에 붙여 같이 걷힌다
 for side in 'SNEW':
@@ -270,10 +274,24 @@ for i in range(int((XA + W / 2) / 0.3)):        # 루프탑 데크 널
     box(gf3, 'plank' if i % 2 else 'plank2', (x, 0, Z3 + 0.015), (0.27, D - 0.3, 0.03))
 
 # ---------------------------------------------------------------- 땅
+# 집 둘레의 동네 터 — 게임의 한 장면처럼 보이게 (두호 2026-11-18: 심즈·남코뮤지엄 느낌의 배경).
+# 넓은 잔디, 문에서 터 끝까지 가는 돌길, 말뚝 울타리, 나무, 가로등, 우편함, 뒤편 언덕. 전부 floor 0 (전체·1층 보기에서만).
+LOT_W, LOT_D = 18.0, 15.0
 g0 = group('ground', 0)
-box(g0, 'grass', (0, 0, -0.1), (W + 2.6, D + 2.4, 0.2))
+box(g0, 'grass', (0, 0, -0.1), (LOT_W, LOT_D, 0.2))
 box(g0, 'grass2', (0, -D / 2 - 0.9, -0.005), (1.2, 1.4, 0.02))           # 문 앞 흙길 자국
 box(g0, 'stone2', (0, 0, 0.0), (W + 0.12, D + 0.12, 0.06))                # 주춧돌 띠
+# 돌길: 문(x≈0.8) 앞에서 남쪽 터 끝까지, 납작한 돌을 엇갈려
+_rng = random.Random(3)
+for i in range(16):
+    yy = -D / 2 - 1.0 - i * 0.42
+    if yy < -LOT_D / 2 + 0.3:
+        break
+    for j, xx in enumerate((0.55, 1.05)):
+        box(g0, 'stone' if (i + j) % 2 else 'stone2', (xx + _rng.uniform(-0.05, 0.05), yy, 0.01), (0.42, 0.34, 0.04), rot=(0, 0, _rng.uniform(-0.15, 0.15)))
+# 뒤편 언덕 (북쪽, 멀리): 납작한 반구 셋
+for (hx, hy, hs, hz) in [(-5.0, LOT_D / 2 + 5.5, 7.0, 1.6), (4.5, LOT_D / 2 + 6.5, 8.0, 2.0), (11.0, LOT_D / 2 + 3.0, 5.0, 1.2)]:
+    sphere(g0, 'grass2', (hx, hy, -0.1), hs, seg=16, scale=(1, 0.55, hz / hs), half=True)
 
 # ---------------------------------------------------------------- 3층: 다락(박공지붕) + 루프탑 + 돔
 AW = XB - XA
@@ -496,6 +514,40 @@ for row in range(3):
         y = -D / 2 + 0.4 + i * 0.27 + row * 0.135
         cyl(gx, 'log' if (i + row) % 2 else 'log2', (W / 2 + 0.38, y, 0.13 + row * 0.23), 0.13, 0.6, axis='X', seg=8)
 
+# ---- 동네 터 소품 (floor 0) ----
+# 말뚝 울타리: 터 가장자리 안쪽 0.6 m, 남쪽 길 자리는 비운다
+FX, FY = LOT_W / 2 - 0.6, LOT_D / 2 - 0.6
+def fence(p0, p1, gap=0.6):
+    n = max(1, int(round(math.dist(p0, p1) / gap)))
+    for i in range(n + 1):
+        t = i / n
+        x, y = p0[0] + (p1[0] - p0[0]) * t, p0[1] + (p1[1] - p0[1]) * t
+        box(gx, 'rule', (x, y, 0.38), (0.08, 0.08, 0.76))
+    mx, my = (p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2
+    along = math.atan2(p1[1] - p0[1], p1[0] - p0[0])
+    for z in (0.25, 0.55):
+        box(gx, 'rule', (mx, my, z), (math.dist(p0, p1), 0.05, 0.07), rot=(0, 0, along))
+fence((-FX, -FY), (-0.2, -FY)); fence((1.8, -FY), (FX, -FY))      # 남쪽 (길 자리 비움)
+fence((-FX, FY), (FX, FY))                                          # 북쪽
+fence((-FX, -FY), (-FX, FY)); fence((FX, -FY), (FX, FY))            # 동·서
+# 나무: 둥근 잎 + 기둥, 울타리 안팎에
+for (x, y, s) in [(-6.5, -4.5, 1.6), (-7.0, 3.5, 1.9), (6.8, 4.5, 1.7), (7.2, -3.8, 1.4), (-3.5, 6.0, 1.5), (4.0, 6.3, 1.8),
+                  (-8.3, -0.5, 1.3), (8.4, 0.8, 1.5), (-5.5, -6.5, 1.2), (5.8, -6.4, 1.6)]:
+    cyl(gx, 'wood2', (x, y, 0.45 * s), 0.11 * s, 0.9 * s, seg=8)
+    sphere(gx, 'leaf', (x, y, 1.25 * s), 0.62 * s, seg=12, scale=(1, 1, 1.15))
+    sphere(gx, 'sage', (x + 0.25 * s, y - 0.2 * s, 1.5 * s), 0.38 * s, seg=10)
+# 가로등 (길 옆) 과 우편함 (울타리 문 옆)
+cyl(gx, 'dark', (1.7, -D / 2 - 2.6, 1.2), 0.05, 2.4, seg=6)
+box(gx, 'dark', (1.7, -D / 2 - 2.6, 2.45), (0.3, 0.3, 0.3))
+box(gx, 'glow', (1.7, -D / 2 - 2.6, 2.42), (0.22, 0.22, 0.22))
+cyl(gx, 'wood2', (2.1, -FY + 0.25, 0.45), 0.04, 0.9, seg=6)
+box(gx, 'red', (2.1, -FY + 0.25, 1.0), (0.22, 0.4, 0.24))
+# 작은 연못 (서쪽 뒤) 과 돌 테두리
+box(g0, 'night', (-5.2, 2.0, -0.03), (2.6, 1.8, 0.04))
+for k in range(14):
+    a = k / 14 * 2 * math.pi
+    box(gx, 'stone', (-5.2 + 1.45 * math.cos(a), 2.0 + 1.05 * math.sin(a), 0.07), (0.3, 0.22, 0.14), rot=(0, 0, a))
+
 # ---------------------------------------------------------------- 2층 갤러리 소품 (화실 왼쪽 · 공방 오른쪽)
 g2 = group('f2_props', 2)
 Zf2 = Z2
@@ -621,13 +673,151 @@ for name, g in GROUPS.items():
     ob.data.name = name
     for k, v in g['props'].items():
         ob[k] = v
+    if name == 'door':                 # 원점을 경첩으로 옮겨 사이트가 rotation 만으로 열 수 있게
+        ob.data.transform(Matrix.Translation(-Vector(DOOR_HINGE)))
+        ob.location = DOOR_HINGE
     ob.parent = root
 for a in ANCHORS:
     a.parent = root
 
+
+# ---------------------------------------------------------------- 구석 그늘(AO) 굽기 → 정점색 COLOR_0
+# 콘솔 게임이 조명을 미리 구워 두듯, 구석이 어두워지는 정도를 정점마다 계산해 glb 에 넣는다.
+# 사이트(building.js)는 이 색을 재질 색에 곱하기만 하므로 런타임 비용이 없다. Cycles 없이 BVH 광선만 쓴다.
+# 큰 면은 정점이 모서리에만 있어 그늘이 밋밋하므로 먼저 AO_EDGE 길이로 잘게 나눈다(삼각형 수가 몇 배 는다).
+from mathutils.bvhtree import BVHTree
+
+AO_EDGE = 0.45        # 이 길이보다 긴 변은 나눈다 (m)
+AO_RAYS = 40          # 정점당 광선 수
+AO_DIST = 1.3         # 이 거리 안의 물체만 그늘을 만든다 (m)
+AO_FLOOR = 0.5        # 가장 어두운 구석의 밝기 (0=검정)
+AO_TINT = (0.82, 0.70, 0.60)   # 그늘 색 (따뜻한 갈색; 회색 그늘은 '3D 렌더' 느낌)
+
+def _subdivide_long(me):
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    for _ in range(4):                     # 한 번에 1/2 씩, 최대 4번
+        long_edges = [e for e in bm.edges if e.calc_length() > AO_EDGE * 1.5]
+        if not long_edges:
+            break
+        bmesh.ops.subdivide_edges(bm, edges=long_edges, cuts=1, use_grid_fill=True)
+    bm.to_mesh(me)
+    bm.free()
+
+def bake_ao(objs):
+    meshes = [o for o in objs if o.type == 'MESH']
+    for o in meshes:
+        _subdivide_long(o.data)
+    # 모든 메시를 세계 좌표의 한 BVH 로
+    verts, polys = [], []
+    for o in meshes:
+        base = len(verts)
+        M = o.matrix_world
+        verts.extend([M @ v.co for v in o.data.vertices])
+        polys.extend([[base + i for i in p.vertices] for p in o.data.polygons])
+    tree = BVHTree.FromPolygons(verts, polys)
+    rng = random.Random(7)
+    # 반구 안의 고정 방향 묶음 (코사인 가중)
+    dirs = []
+    for _ in range(AO_RAYS):
+        u, v = rng.random(), rng.random()
+        r = math.sqrt(u); phi = 2 * math.pi * v
+        dirs.append(Vector((r * math.cos(phi), r * math.sin(phi), math.sqrt(max(0.0, 1 - u)))))
+    for o in meshes:
+        me = o.data
+        glow = all(m.name.startswith('glow') for m in me.materials if m)
+        col = me.color_attributes.new('ao', 'BYTE_COLOR', 'CORNER')   # 바이트면 glb 가 1/4
+        me.color_attributes.active_color = col
+        M = o.matrix_world
+        cache = {}
+        for p in me.polygons:
+            pc = M @ p.center
+            for li in p.loop_indices:
+                vi = me.loops[li].vertex_index
+                # 평평한 면은 면 법선, 둥근 면(smooth)은 정점 법선 — 그래야 둥근 면의 꼭짓점 색이 면마다 같아
+                # 정점이 공유되고, 사이트가 계산한 법선도 매끈해진다
+                n = (M.to_3x3() @ (me.vertices[vi].normal if p.use_smooth else p.normal)).normalized()
+                key = (vi, round(n.x, 2), round(n.y, 2), round(n.z, 2))
+                if key not in cache:
+                    a = Vector((1, 0, 0)) if abs(n.x) < 0.9 else Vector((0, 1, 0))
+                    t = n.cross(a).normalized(); b = n.cross(t)
+                    if glow:
+                        cache[key] = 1.0
+                    else:
+                        wp = M @ me.vertices[vi].co
+                        origin = wp + (pc - wp) * 0.08 + n * 0.015    # 모서리에서 살짝 안쪽·위쪽
+                        occ = 0.0
+                        for d in dirs:
+                            wd = t * d.x + b * d.y + n * d.z
+                            hit = tree.ray_cast(origin, wd, AO_DIST)
+                            if hit[0] is not None:
+                                occ += 1.0 - hit[3] / AO_DIST
+                        cache[key] = 1.0 - occ / AO_RAYS
+                ao = cache[key]
+                # 밝은 곳은 흰색(원래 색 그대로), 가장 어두운 구석은 AO_TINT * AO_FLOOR
+                col.data[li].color_srgb = tuple(c * AO_FLOOR + (1 - c * AO_FLOOR) * ao for c in AO_TINT) + (1.0,)
+
+bake_ao([o for o in bpy.data.objects if o.type == 'MESH'])
+
+# ---------------------------------------------------------------- 텍스처 + UV (상자 투영)
+# textures.py 가 나뭇결·지붕널·회벽·돌·풀을 그린다. UV 는 세계 좌표를 면의 주 법선 축으로 투영(1 타일 = 1 m × 타일/m).
+import os
+import tempfile
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import textures
+
+TEX_DIR = tempfile.mkdtemp(prefix='house_tex_')
+TEX = textures.make_all({k: COL[k] for k in textures.RECIPES if k in COL}, TEX_DIR)
+
+def texture_materials():
+    for key, (path, tiles, swap) in TEX.items():
+        m = MATS.get(key)
+        if m is None:
+            continue
+        nt = m.node_tree
+        bsdf = nt.nodes.get('Principled BSDF')
+        img = bpy.data.images.load(path)
+        img.name = key
+        img.pack()
+        tex = nt.nodes.new('ShaderNodeTexImage')
+        tex.image = img
+        nt.links.new(tex.outputs['Color'], bsdf.inputs['Base Color'])
+
+def project_uvs(objs):
+    for o in objs:
+        if o.type != 'MESH':
+            continue
+        me = o.data
+        uv = me.uv_layers.new(name='UVMap')
+        M = o.matrix_world
+        for p in me.polygons:
+            key = me.materials[p.material_index].name if me.materials and me.materials[p.material_index] else ''
+            if key not in TEX:                 # 텍스처 없는 재질은 UV 0 — 정점이 안 갈라져 둥근 면이 매끈하고 파일도 작다
+                for li in p.loop_indices:
+                    uv.data[li].uv = (0.0, 0.0)
+                continue
+            tiles, swap = TEX[key][1], TEX[key][2]
+            n = (M.to_3x3() @ p.normal)
+            ax = max(range(3), key=lambda i: abs(n[i]))
+            for li in p.loop_indices:
+                w = M @ me.vertices[me.loops[li].vertex_index].co
+                if ax == 2:        # 위·아래 면: x,y
+                    u, v = w.x, w.y
+                elif ax == 0:      # 동·서 면: y,z
+                    u, v = w.y, w.z
+                else:              # 남·북 면: x,z
+                    u, v = w.x, w.z
+                if swap and ax != 2:
+                    u, v = v, u
+                uv.data[li].uv = (u * tiles, v * tiles)
+
+texture_materials()
+project_uvs([o for o in bpy.data.objects if o.type == 'MESH'])
+
 out = sys.argv[-1] if sys.argv[-1].endswith('.glb') else 'house.glb'
 bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', export_extras=True, export_apply=True,
-                          export_yup=True, export_materials='EXPORT', export_normals=True,
-                          use_selection=False)
+                          export_yup=True, export_materials='EXPORT', export_normals=False,   # 면이 평평해 법선은 GLTFLoader 가 계산해도 같다 (glb 25% 절약)
+                          use_selection=False, export_vertex_color='ACTIVE', export_all_vertex_colors=False,
+                          export_image_format='WEBP', export_image_quality=80)
 tris = sum(len(o.data.polygons) for o in bpy.data.objects if o.type == 'MESH')
 print('EXPORTED', out, 'groups', len(GROUPS), 'faces', tris)

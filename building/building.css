@@ -9,7 +9,17 @@
 .stage.nowebgl ~ .bar,.stage.failed ~ .bar{display:none}
 .home-page header .wrap{padding:12px 0}
 .bar .floors,.bar .hint{margin:0}
-.zoom{display:flex;gap:6px;margin-right:auto}
+.zoom{display:flex;gap:6px}
+.bar .walk{font:inherit;font-size:13px;letter-spacing:.04em;background:transparent;color:var(--ink-2);border:1px solid var(--rule);border-radius:2px;padding:5px 12px;cursor:pointer;margin-right:auto}
+.bar .walk[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.bar .walk:focus-visible{outline:2px solid var(--mustard);outline-offset:2px}
+.bar button:disabled{opacity:.4;cursor:default}
+/* 1인칭 걷기: 가상 조이스틱 — 왼쪽 반을 누른 자리(left/top 은 코드가 넣음)에 뜨고, 손가락을 떼면 사라진다 */
+.joy{position:absolute;width:104px;height:104px;margin:-52px 0 0 -52px;border:1px solid var(--rule);border-radius:50%;background:color-mix(in srgb,var(--paper) 55%,transparent);pointer-events:none}
+.joy[hidden]{display:none}
+.joy .knob{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:var(--ink);opacity:.75}
+.stage.walking{touch-action:none}
+.stage.walking{cursor:crosshair}
 .zoom button{font:inherit;font-size:16px;line-height:1;width:34px;height:31px;background:transparent;color:var(--ink-2);border:1px solid var(--rule);border-radius:2px;cursor:pointer}
 .zoom button:focus-visible{outline:2px solid var(--mustard);outline-offset:2px}
 footer.slim{margin:0;padding:8px 0;background:transparent}
@@ -56,7 +66,8 @@ footer.slim a{color:var(--ink-2)}
 .rooms li small{display:block;font-size:13px;color:var(--ink-2)}
 .rooms h2{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 .stage.nowebgl canvas,.stage.nowebgl .labels{display:none}
-.stage .fallback{display:none;padding:24px;color:var(--ink-2);font-size:14px}
+.stage .fallback{display:none;padding:12px 24px 24px;color:var(--ink-2);font-size:14px}
+.stage .fallback img{display:block;width:min(100%,720px);height:auto;margin:0 auto 12px}   /* 3D 가 안 되는 기기용 정지 그림 (still.js 로 만든 house.webp) */
 .stage.nowebgl .fallback{display:block}
 @media(max-width:720px){.stage{height:62vh;min-height:320px}.home-page .stage{height:auto}.callout b{font-size:13px}.callout small{display:none}}
 @media(max-width:480px){.callout{padding:3px 5px}.callout b{font-size:12.5px}}
