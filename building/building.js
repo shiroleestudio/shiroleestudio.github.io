@@ -264,7 +264,8 @@ stage.addEventListener('pointermove', (e) => {
     } else if (e.pointerId === lookId) {
       const dx = e.clientX - lastX, dy = e.clientY - lastY;
       lastX = e.clientX; lastY = e.clientY; moved += Math.abs(dx) + Math.abs(dy);
-      wYaw -= dx * 0.004; wPitch = Math.min(1.1, Math.max(-1.1, wPitch - dy * 0.003)); dirty = true;
+      const k = e.pointerType === 'mouse' ? 0.004 : 0.0022;                   // 손가락은 마우스보다 둔하게 (멀미)
+      wYaw -= dx * k; wPitch = Math.min(0.9, Math.max(-0.9, wPitch - dy * k * 0.7)); dirty = true;
     }
     return;
   }
@@ -345,6 +346,7 @@ function resize() {
   post.uniforms.texel.value.set(1 / (w * pr), 1 / (h * pr));
   post.uniforms.line.value = Math.max(1, pr * 0.9);
   camera.aspect = w / h;
+  camera.fov = walking ? (camera.aspect < 1 ? 85 : 62) : 28;
   const vf = THREE.MathUtils.degToRad(camera.fov) / 2;
   const hf = Math.atan(Math.tan(vf) * camera.aspect);
   // 건물은 가운데 폭의 일부만 쓰고, 양옆은 이름표 칸으로 비워 둔다
@@ -469,10 +471,10 @@ function setWalking(on) {
   joyId = lookId = null; joy.f = joy.r = 0;
   if (hintEl) hintEl.textContent = on ? (matchMedia('(hover: none)').matches ? '왼쪽을 누른 채 밀어 걷고, 오른쪽을 끌어 둘러봐요. 현관으로 들어갈 수 있어요' : '방향키·WASD 로 걷고, 끌어서 둘러봐요. 현관으로 들어갈 수 있어요') : hintOrbit;
   stage.classList.toggle('walking', on);
-  camera.fov = on ? 62 : 28;
   if (on) { camera.near = 0.1; camera.far = 80; post.uniforms.near.value = 0.1; post.uniforms.far.value = 80; }
   lastRR = NaN; keys.clear();
-  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(devicePixelRatio, on ? 1.5 : 2));           // 걷는 동안은 조금 낮은 해상도로 — 프레임이 끊기면 멀미가 난다
+  resize();                                                                    // 시야각(걷기: 세로 화면 85°, 가로 62°)·크기 다시
   dirty = true;
 }
 if (walkBtn) walkBtn.addEventListener('click', () => setWalking(!walking));
