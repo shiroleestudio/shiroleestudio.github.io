@@ -12,15 +12,13 @@
 .zoom{display:flex;gap:6px}
 .bar .walk{font:inherit;font-size:13px;letter-spacing:.04em;background:transparent;color:var(--ink-2);border:1px solid var(--rule);border-radius:2px;padding:5px 12px;cursor:pointer;margin-right:auto}
 .bar .walk[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
-.bar .walk:focus-visible,.walkpad button:focus-visible{outline:2px solid var(--mustard);outline-offset:2px}
+.bar .walk:focus-visible{outline:2px solid var(--mustard);outline-offset:2px}
 .bar button:disabled{opacity:.4;cursor:default}
-/* 1인칭 걷기: 터치용 방향 단추 (마우스·키보드가 있는 기기에선 숨김) */
-.walkpad{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:grid;justify-items:center;gap:4px;pointer-events:auto;touch-action:none}
-.walkpad[hidden]{display:none}
-.walkpad div{display:flex;gap:4px}
-.walkpad button{width:48px;height:44px;font-size:16px;background:var(--paper);color:var(--ink);border:1px solid var(--rule);border-radius:2px;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
-@media(hover:hover) and (pointer:fine){.walkpad{display:none}}
-@media(max-width:519px){.walkpad{left:auto;right:10px;bottom:auto;top:50%;transform:translateY(-50%)}}   /* 좁은 화면: 이름표 띠(위아래)를 피해 오른쪽 가운데 */
+/* 1인칭 걷기: 가상 조이스틱 — 왼쪽 반을 누른 자리(left/top 은 코드가 넣음)에 뜨고, 손가락을 떼면 사라진다 */
+.joy{position:absolute;width:104px;height:104px;margin:-52px 0 0 -52px;border:1px solid var(--rule);border-radius:50%;background:color-mix(in srgb,var(--paper) 55%,transparent);pointer-events:none}
+.joy[hidden]{display:none}
+.joy .knob{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:var(--ink);opacity:.75}
+.stage.walking{touch-action:none}
 .stage.walking{cursor:crosshair}
 .zoom button{font:inherit;font-size:16px;line-height:1;width:34px;height:31px;background:transparent;color:var(--ink-2);border:1px solid var(--rule);border-radius:2px;cursor:pointer}
 .zoom button:focus-visible{outline:2px solid var(--mustard);outline-offset:2px}

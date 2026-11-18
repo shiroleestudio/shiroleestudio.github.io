@@ -235,13 +235,39 @@ let dragging = false, lastX = 0, lastY = 0, moved = 0, downAt = 0;
 const pointers = new Map(); let pinchD = 0;
 const pinchDist = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
 stage.addEventListener('pointerdown', (e) => {
-  if (e.target.closest('.callout, .walkpad')) return;
+  if (e.target.closest('.callout')) return;
+  if (walking) {                       // 1인칭: 왼쪽 반 터치 = 조이스틱, 그 밖(오른쪽·마우스) = 끌어서 둘러보기
+    try { stage.setPointerCapture(e.pointerId); } catch (_) { /* 합성 이벤트 */ }
+    const b = stage.getBoundingClientRect();
+    if (e.pointerType !== 'mouse' && joyId === null && e.clientX - b.left < b.width / 2) {
+      joyId = e.pointerId; joyOrigin.x = e.clientX; joyOrigin.y = e.clientY; joy.f = joy.r = 0;
+      joyEl.hidden = false; joyEl.style.left = `${e.clientX - b.left}px`; joyEl.style.top = `${e.clientY - b.top}px`;
+      joyKnob.style.transform = 'translate(0px, 0px)';
+      return;
+    }
+    if (lookId !== null) return;
+    lookId = e.pointerId; lastX = e.clientX; lastY = e.clientY; moved = 0; downAt = performance.now();
+    return;
+  }
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   stage.setPointerCapture(e.pointerId);
   if (pointers.size === 2) { pinchD = pinchDist(); moved = 99; yawVel = pitchVel = 0; return; }
   dragging = true; lastX = e.clientX; lastY = e.clientY; moved = 0; downAt = performance.now(); yawVel = pitchVel = 0;
 });
 stage.addEventListener('pointermove', (e) => {
+  if (walking) {
+    if (e.pointerId === joyId) {
+      const dx = e.clientX - joyOrigin.x, dy = e.clientY - joyOrigin.y;
+      const len = Math.hypot(dx, dy), k = len > JOY_R ? JOY_R / len : 1;
+      joy.r = (dx * k) / JOY_R; joy.f = -(dy * k) / JOY_R;               // 위로 밀면 앞으로
+      joyKnob.style.transform = `translate(${(dx * k).toFixed(0)}px, ${(dy * k).toFixed(0)}px)`;
+    } else if (e.pointerId === lookId) {
+      const dx = e.clientX - lastX, dy = e.clientY - lastY;
+      lastX = e.clientX; lastY = e.clientY; moved += Math.abs(dx) + Math.abs(dy);
+      wYaw -= dx * 0.004; wPitch = Math.min(1.1, Math.max(-1.1, wPitch - dy * 0.003)); dirty = true;
+    }
+    return;
+  }
   if (!pointers.has(e.pointerId)) return;
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (pointers.size >= 2) {
@@ -253,9 +279,6 @@ stage.addEventListener('pointermove', (e) => {
   if (!dragging) return;
   const dx = e.clientX - lastX, dy = e.clientY - lastY;
   lastX = e.clientX; lastY = e.clientY; moved += Math.abs(dx) + Math.abs(dy);
-  if (walking) {                       // 1인칭: 끌면 고개를 돌린다
-    wYaw -= dx * 0.004; wPitch = Math.min(1.1, Math.max(-1.1, wPitch - dy * 0.003)); dirty = true; return;
-  }
   const d = -dx * 0.008, dp = dy * 0.006;
   yaw += d; yawVel = d;
   const np = clampPitch(pitch + dp); pitchVel = np - pitch; pitch = np;
@@ -270,11 +293,17 @@ function release(e) {
   const was = dragging; dragging = false; pinchD = 0;
   return was;
 }
+function walkRelease(e) {
+  if (e.pointerId === joyId) { joyId = null; joy.f = joy.r = 0; joyEl.hidden = true; return false; }
+  if (e.pointerId === lookId) { lookId = null; return true; }
+  return false;
+}
 stage.addEventListener('pointerup', (e) => {
+  if (walking) { if (walkRelease(e) && moved < 8 && performance.now() - downAt < 400) pick(e); return; }
   if (!pointers.has(e.pointerId)) return;
   if (release(e) && moved < 8 && performance.now() - downAt < 400) pick(e);
 });
-stage.addEventListener('pointercancel', release);
+stage.addEventListener('pointercancel', (e) => { if (walking) walkRelease(e); else release(e); });
 // iOS Safari: 무대 위 두 손가락은 페이지 확대가 아니라 집 확대로
 stage.addEventListener('gesturestart', (e) => e.preventDefault());
 stage.addEventListener('wheel', (e) => {
@@ -385,10 +414,15 @@ function frame() {
 
 // ---- 1인칭 걷기 (두호 2026-11-18: 남코뮤지엄처럼 들어가 보기) ----
 // '걷기' 단추로 켠다. 울타리 문 앞에서 시작해 마당을 걷고, 현관으로 1층 찻집에 들어간다 (계단은 없다).
-// 키보드 WASD·방향키, 터치는 화면의 방향 단추. 끌면 고개를 돌린다. Esc 또는 단추로 나온다.
+// 키보드 WASD·방향키. 터치는 모바일 FPS 식: 왼쪽 반을 누른 자리에 조이스틱이 떠서 밀면 걷고, 오른쪽 반을 끌면 둘러본다(두 손가락 동시 가능).
+// 마우스는 끌면 고개를 돌린다. Esc 또는 단추로 나온다.
 // three 좌표: 모델의 남쪽(정문)이 +z. 집 발자국 ±3 × ±2.5, 현관은 x 0.35~1.25 의 남쪽 벽.
 const walkBtn = document.querySelector('[data-walk]');
-const walkPad = document.getElementById('walkpad');
+const joyEl = document.getElementById('joy');              // 가상 조이스틱 (왼쪽 반을 누른 자리에 뜬다)
+const joyKnob = joyEl ? joyEl.firstElementChild : null;
+const JOY_R = 44;                                           // 스틱이 움직이는 반지름(px)
+const joy = { f: 0, r: 0 }, joyOrigin = { x: 0, y: 0 };
+let joyId = null, lookId = null;
 const hintEl = document.querySelector('.bar .hint');
 const hintOrbit = hintEl ? hintEl.textContent : '';
 let walking = false;
@@ -413,10 +447,10 @@ function walkStep(dt) {
     const ry = door.rotation.y + (want - door.rotation.y) * Math.min(1, dt * 6);
     if (Math.abs(ry - door.rotation.y) > 0.0005) { door.rotation.y = ry; dirty = true; }
   }
-  let f = 0, r = 0;
+  let f = joy.f, r = joy.r;
   if (keys.has('f')) f += 1; if (keys.has('b')) f -= 1; if (keys.has('r')) r += 1; if (keys.has('l')) r -= 1;
-  if (!f && !r) return;
-  const len = Math.hypot(f, r); f /= len; r /= len;
+  if (Math.abs(f) < 0.05 && Math.abs(r) < 0.05) return;
+  const len = Math.hypot(f, r); if (len > 1) { f /= len; r /= len; }   // 스틱은 살짝 밀면 천천히
   const sy = Math.sin(wYaw), cy = Math.cos(wYaw);
   const dx = (-sy * f + cy * r) * SPEED * dt, dz = (-cy * f - sy * r) * SPEED * dt;
   if (!blocked(player.x + dx, player.z + dz)) { player.x += dx; player.z += dz; }
@@ -431,8 +465,9 @@ function setWalking(on) {
   for (const b of floorButtons) b.disabled = on;
   for (const b of document.querySelectorAll('[data-zoom]')) b.disabled = on;
   if (walkBtn) walkBtn.setAttribute('aria-pressed', String(on));
-  if (walkPad) walkPad.hidden = !on;
-  if (hintEl) hintEl.textContent = on ? '방향키·WASD 로 걷고, 끌어서 둘러봐요. 현관으로 들어갈 수 있어요' : hintOrbit;
+  if (joyEl) joyEl.hidden = true;
+  joyId = lookId = null; joy.f = joy.r = 0;
+  if (hintEl) hintEl.textContent = on ? (matchMedia('(hover: none)').matches ? '왼쪽을 누른 채 밀어 걷고, 오른쪽을 끌어 둘러봐요. 현관으로 들어갈 수 있어요' : '방향키·WASD 로 걷고, 끌어서 둘러봐요. 현관으로 들어갈 수 있어요') : hintOrbit;
   stage.classList.toggle('walking', on);
   camera.fov = on ? 62 : 28;
   if (on) { camera.near = 0.1; camera.far = 80; post.uniforms.near.value = 0.1; post.uniforms.far.value = 80; }
@@ -449,11 +484,6 @@ addEventListener('keydown', (e) => {
 });
 addEventListener('keyup', (e) => { if (KEYMAP[e.code]) keys.delete(KEYMAP[e.code]); });
 addEventListener('blur', () => keys.clear());
-if (walkPad) for (const b of walkPad.querySelectorAll('[data-move]')) {
-  const on = (e) => { e.preventDefault(); keys.add(b.dataset.move); };
-  const off = () => keys.delete(b.dataset.move);
-  b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('pointerleave', off);
-}
 
 // 라벨: 건물 밖 양옆 칸에 세우고, 방까지 인출선으로 잇는다 (도감처럼)
 const NS = 'http://www.w3.org/2000/svg';
