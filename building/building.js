@@ -391,7 +391,7 @@ function frame() {
     }
     if (walking) {                    // 1인칭: 눈높이에서 보는 방향대로. 벽은 걷어 내지 않는다
       camera.position.set(player.x, EYE, player.z);
-      camera.rotation.set(wPitch, wYaw, 0);
+      camera.rotation.set(wPitch, wYaw, 0, 'YXZ');   // 좌우(yaw) 먼저, 그 다음 위아래 — 기본 XYZ 면 고개를 든 채 돌 때 시선이 비스듬히 밀린다
       camDir.set(-Math.sin(wYaw), 0, -Math.cos(wYaw));
     } else {
       camera.position.set(tgt.x + rr * Math.cos(pitch) * Math.sin(yaw), tgt.y + rr * Math.sin(pitch), tgt.z + rr * Math.cos(pitch) * Math.cos(yaw));
