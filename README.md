@@ -10,6 +10,7 @@
 - `about/` — 시로 이야기, `support/` — 자주 묻는 질문·문의
 - `sitemap.xml`, `robots.txt`, `assets/og.png`(공유 이미지), `assets/img/`(스크린샷)
 - `privacy/<앱이름>/` — 앱별 개인정보처리방침 (swingby, timeline, coffee)
+- `ads.txt` — 웹 애드센스 판매자 확인(루트 도메인에 두면 timeline. 등 서브도메인까지 적용). 게시자 ID 는 애드센스 계정의 것.
 - `app-ads.txt` — 애드몹 app-ads.txt (가입 후 한 줄 채움)
 - `404.html` — 없는 주소 안내
 
