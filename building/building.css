@@ -1,8 +1,8 @@
 /* 시로의 집 — 허브 첫 화면의 3D 건물. 색은 site.css 토큰만. */
 /* 첫 화면은 3D 만: 머리줄 · 무대(남는 높이 전부) · 층 버튼 줄 · 한 줄 바닥글 */
 .home-page{min-height:100vh;min-height:100svh;display:flex;flex-direction:column}
-.home-page main{flex:1;display:flex;flex-direction:column}
-.home-page .house{flex:1;display:flex;flex-direction:column;padding:0}
+.home-page main{flex:1;display:flex;flex-direction:column;min-height:0}   /* min-height:0 이 없으면 캔버스의 고유 높이(폭의 절반)가 무대를 키워 층 버튼 줄이 화면 아래로 밀린다 */
+.home-page .house{flex:1;display:flex;flex-direction:column;padding:0;min-height:0}
 .home-page .stage{flex:1;height:auto;min-height:340px;margin:0;border:0;outline:0;border-bottom:1px solid var(--rule)}
 .sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 .bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;width:min(900px,100% - 32px);margin:0 auto;padding:6px 0}
@@ -37,7 +37,7 @@ footer.slim a{color:var(--ink-2)}
 .stage{position:relative;height:min(78vh,720px);min-height:380px;margin-top:18px;border:10px solid var(--wood);outline:1px solid var(--wood-2);background:var(--paper-2);
   background-image:repeating-linear-gradient(0deg,rgba(0,0,0,.025) 0 1px,transparent 1px 3px);touch-action:none;cursor:grab;user-select:none;overflow:hidden}
 .stage:active{cursor:grabbing}
-.stage canvas{display:block;width:100%;height:100%}
+.stage canvas{display:block;position:absolute;inset:0;width:100%;height:100%}   /* 절대 배치: 캔버스 크기가 레이아웃에 끼지 않게 */
 .labels{position:absolute;inset:0;pointer-events:none}
 .leads{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .leads path{fill:none;stroke:var(--ink);stroke-width:1;opacity:.75}
