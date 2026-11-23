@@ -20,6 +20,12 @@
 .joy .knob{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:var(--ink);opacity:.75}
 .stage.walking{touch-action:none}
 .stage.walking{cursor:crosshair}
+.stage.locked{cursor:none}
+.stage.locked::after{content:"";position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:var(--paper);outline:1px solid var(--ink);opacity:.8;pointer-events:none}   /* 마우스가 잠긴 동안 가운데 점 */
+/* 걷기: 가까운 방 이름표 하나만 그 자리 위에 */
+.callout.near{text-align:center;border-color:var(--ink);box-shadow:0 2px 0 var(--rule)}
+.callout.near .txt::after{content:"열기 · 탭 또는 E";display:block;font-size:11px;letter-spacing:.08em;color:var(--ink-2);margin-top:3px}
+@media(hover:none){.callout.near .txt::after{content:"탭해서 열기"}}
 .zoom button{font:inherit;font-size:16px;line-height:1;width:34px;height:31px;background:transparent;color:var(--ink-2);border:1px solid var(--rule);border-radius:2px;cursor:pointer}
 .zoom button:focus-visible{outline:2px solid var(--mustard);outline-offset:2px}
 footer.slim{margin:0;padding:8px 0;background:transparent}
@@ -70,5 +76,6 @@ footer.slim a{color:var(--ink-2)}
 .stage .fallback img{display:block;width:min(100%,720px);height:auto;margin:0 auto 12px}   /* 3D 가 안 되는 기기용 정지 그림 (still.js 로 만든 house.webp) */
 .stage.nowebgl .fallback{display:block}
 @media(max-width:720px){.stage{height:62vh;min-height:320px}.home-page .stage{height:auto}.callout b{font-size:13px}.callout small{display:none}}
+@media(max-height:520px){.home-page .stage{min-height:200px}.home-page header .wrap{padding:6px 0}}   /* 폰 가로: 무대 최소 높이를 낮춰 버튼 줄이 화면 안에 */
 @media(max-width:480px){.callout{padding:3px 5px}.callout b{font-size:12.5px}}
 .loading{position:absolute;inset:auto 0 45% 0;text-align:center;font-size:14px;color:var(--ink-2);margin:0}
