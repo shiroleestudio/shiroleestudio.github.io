@@ -5,7 +5,7 @@
 # 좌표: Blender X=가로(오른쪽 +), Y=깊이(정면 -Y), Z=위. glTF 로 내보내면 three.js 에서 정면이 +Z.
 #
 # 사이트가 읽는 약속 (building.js):
-#  - 노드 extras: floor(1·2·3, 0=땅), cut('S','N','E','W' = 카메라가 그쪽에 있으면 걷어낼 면).
+#  - 노드 extras: floor(1·2·3, 0=땅, -1=지하실), cut('S','N','E','W' = 카메라가 그쪽에 있으면 걷어낼 면).
 #  - 빈 객체 anchor_<id>: 방 라벨이 붙는 자리.
 #  - 재질 이름 glow*: 불 켜진 창·전구 (조명 없이 그 색 그대로).
 # 캐릭터(시로·카피바라씨·코알라씨)는 넣지 않는다. TODO(character-sheet).
@@ -109,6 +109,41 @@ def prism(grp, matkey, pts2d, y0, y1, plane='XZ'):
         bm.faces.new((a[i], a[j], b[j], b[i]))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     return _obj_from_bm(bm, 'prism', matkey, grp)
+
+def slab(grp, matkey, center, size, holes=()):
+    """납작한 판(center·size 는 box 와 같다)에서 사각 구멍 holes=[(x0,x1,y0,y1)] 을 뺀 조각들."""
+    cx, cy, cz = center; sx, sy, sz = size
+    xs = sorted({cx - sx / 2, cx + sx / 2, *[h[0] for h in holes], *[h[1] for h in holes]})
+    ys = sorted({cy - sy / 2, cy + sy / 2, *[h[2] for h in holes], *[h[3] for h in holes]})
+    xs = [x for x in xs if cx - sx / 2 <= x <= cx + sx / 2]
+    ys = [y for y in ys if cy - sy / 2 <= y <= cy + sy / 2]
+    for x0, x1 in zip(xs, xs[1:]):
+        for y0, y1 in zip(ys, ys[1:]):
+            mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+            if any(h[0] < mx < h[1] and h[2] < my < h[3] for h in holes):
+                continue
+            if x1 - x0 < 0.01 or y1 - y0 < 0.01:
+                continue
+            box(grp, matkey, (mx, my, cz), (x1 - x0, y1 - y0, sz))
+
+def stairs(grp, matkeys, x0, x1, ya, yb, z0, z1, n, base=None, thin=False):
+    """y 방향 직선 계단: ya(아래) 에서 yb(위) 로 n 단. 기본은 디딤판에서 base(=z0) 까지 꽉 찬 상자(옆이 막힌 계단).
+    thin 이면 디딤판·챌판만 두고 아래를 비운다 (아래에 다른 계단이 지나가는 2층→3층 계단)."""
+    base = z0 if base is None else base
+    for k in range(n):
+        t0, t1 = k / n, (k + 1) / n
+        yy0, yy1 = ya + (yb - ya) * t0, ya + (yb - ya) * t1
+        top = z0 + (z1 - z0) * t1
+        if thin:
+            rise = (z1 - z0) / n
+            box(grp, matkeys[k % len(matkeys)], ((x0 + x1) / 2, (yy0 + yy1) / 2, top - 0.03), (x1 - x0, abs(yy1 - yy0) + 0.004, 0.06))   # 디딤판
+            box(grp, 'wood2', ((x0 + x1) / 2, yy0 + 0.02, top - rise / 2), (x1 - x0, 0.04, rise))                                   # 챌판
+        else:
+            box(grp, matkeys[k % len(matkeys)], ((x0 + x1) / 2, (yy0 + yy1) / 2, (base + top) / 2), (x1 - x0, abs(yy1 - yy0) + 0.004, top - base))
+    if thin:   # 양옆 옆판(계단 옆 널)
+        L = math.hypot(yb - ya, z1 - z0)
+        for xx in (x0 + 0.03, x1 - 0.03):
+            box(grp, 'wood2', (xx, (ya + yb) / 2, (z0 + z1) / 2 - 0.12), (0.05, L, 0.3), rot=(-math.atan2(z1 - z0, yb - ya), 0, 0))
 
 def _rot(r):
     if r is None:
@@ -263,22 +298,75 @@ for side in 'SNEW':
 # ---------------------------------------------------------------- 바닥판
 gf1 = group('f1_floor', 1)
 box(gf1, 'floor', (0, 0, 0.04), (W - 0.1, D - 0.1, 0.08))
+# 계단(1인칭 걷기용, 2026-11-23): 서쪽 벽을 따라 남→북으로 오르는 직선 계단 둘. 1층→2층은 찻집 왼쪽 벽, 2층→3층은 그 바로 위, 루프탑 데크로 나온다.
+# 위층 바닥에는 계단 머리 위 구멍(STAIR_HOLE). building.js 의 발높이(surfaces)·충돌 수치가 이 좌표와 같아야 한다.
+SX0, SX1 = -2.85, -2.0                 # 계단 폭 (x)
+ST12 = (-0.6, 2.28, 0.08, Z2, 12)      # (아래 y, 위 y, 아래 z, 위 z, 단 수)
+ST23 = (-0.6, 2.1, Z2, Z3, 12)
+HOLE12 = (SX0 - 0.05, SX1 + 0.05, 0.25, ST12[1])   # 2층 바닥 구멍 (1층 계단 머리 위)
+HOLE23 = (SX0 - 0.05, SX1 + 0.05, 0.3, ST23[1])    # 3층 바닥 구멍
 gf2 = group('f2_floor', 2)
-box(gf2, 'beam', (0, 0, H1 + BAND / 2), (W - 0.2, D - 0.2, BAND - 0.02))
-box(gf2, 'floor', (0, 0, Z2 - 0.02), (W - 0.3, D - 0.3, 0.04))
+slab(gf2, 'beam', (0, 0, H1 + BAND / 2), (W - 0.2, D - 0.2, BAND - 0.02), [HOLE12])
+slab(gf2, 'floor', (0, 0, Z2 - 0.02), (W - 0.3, D - 0.3, 0.04), [HOLE12])
 gf3 = group('f3_floor', 3)
-box(gf3, 'beam', (0, 0, Z3 - 0.12), (W - 0.2, D - 0.2, 0.2))
-box(gf3, 'floor', (0, 0, Z3 - 0.02), (W - 0.3, D - 0.3, 0.04))
-for i in range(int((XA + W / 2) / 0.3)):        # 루프탑 데크 널
+slab(gf3, 'beam', (0, 0, Z3 - 0.12), (W - 0.2, D - 0.2, 0.2), [HOLE23])
+slab(gf3, 'floor', (0, 0, Z3 - 0.02), (W - 0.3, D - 0.3, 0.04), [HOLE23])
+for i in range(int((XA + W / 2) / 0.3)):        # 루프탑 데크 널 (계단 구멍 자리는 비운다)
     x = -W / 2 + 0.15 + i * 0.3
-    box(gf3, 'plank' if i % 2 else 'plank2', (x, 0, Z3 + 0.015), (0.27, D - 0.3, 0.03))
+    slab(gf3, 'plank' if i % 2 else 'plank2', (x, 0, Z3 + 0.015), (0.27, D - 0.3, 0.03), [HOLE23])
+gS1 = group('f1_stairs', 1)
+stairs(gS1, ['plank', 'plank2'], SX0, SX1, *ST12)
+gS2 = group('f2_stairs', 2)
+stairs(gS2, ['plank', 'plank2'], SX0, SX1, *ST23, thin=True)   # 아래로 1층 계단이 지나가 머리 공간을 비운다
+# 난간: 계단 안쪽(x = SX1) 에 기둥 셋 + 비스듬한 손잡이
+for g, (ya, yb, za, zb, n) in ((gS1, ST12), (gS2, ST23)):
+    for t in (0.08, 0.5, 0.92):
+        y = ya + (yb - ya) * t; z = za + (zb - za) * t
+        box(g, 'wood2', (SX1 + 0.04, y, z + 0.45), (0.06, 0.06, 0.9))
+    L = math.hypot(yb - ya, zb - za)
+    box(g, 'beam', (SX1 + 0.04, (ya + yb) / 2, (za + zb) / 2 + 0.9), (0.07, L * 0.9, 0.07), rot=(-math.atan2(zb - za, yb - ya), 0, 0))
+# 2층 계단 구멍 동쪽 난간 (1층 계단 머리 둘레)
+for t in (0.0, 0.5, 1.0):
+    y = HOLE12[2] + (1.6 - HOLE12[2]) * t
+    box(gS2, 'wood2', (SX1 + 0.1, y, Z2 + 0.42), (0.06, 0.06, 0.84))
+box(gS2, 'beam', (SX1 + 0.1, (HOLE12[2] + 1.6) / 2, Z2 + 0.84), (0.08, 1.6 - HOLE12[2] + 0.1, 0.07))
+box(gS2, 'beam', (SX1 + 0.1, (HOLE12[2] + 1.6) / 2, Z2 + 0.4), (0.05, 1.6 - HOLE12[2], 0.05))
+# 루프탑 계단 머리 난간 (데크 위, 구멍 둘레 ㄷ자)
+RAIL_LATER = [((SX1 + 0.12, HOLE23[2]), (SX1 + 0.12, 1.6)), ((SX0, HOLE23[2] - 0.02), (SX1 + 0.12, HOLE23[2] - 0.02))]   # 계단 머리 난간: 동쪽은 위쪽 끝을 터 둔다(그리로 나온다)
 
 # ---------------------------------------------------------------- 땅
 # 집 둘레의 동네 터 — 게임의 한 장면처럼 보이게 (두호 2026-11-18: 심즈·남코뮤지엄 느낌의 배경).
 # 넓은 잔디, 문에서 터 끝까지 가는 돌길, 말뚝 울타리, 나무, 가로등, 우편함, 뒤편 언덕. 전부 floor 0 (전체·1층 보기에서만).
 LOT_W, LOT_D = 18.0, 15.0
 g0 = group('ground', 0)
-box(g0, 'grass', (0, 0, -0.1), (LOT_W, LOT_D, 0.2))
+# 지하실(2026-11-23): 집 발자국 아래 돌방. 바깥 서쪽 벽 옆 돌계단 구덩이(TRENCH)로 내려가 서쪽 벽 문으로 든다 (찻집 안을 비우지 않아도 된다).
+BZ = -2.6                                   # 지하실 바닥 z
+HOLE_HOUSE = (-W / 2 - 0.06, W / 2 + 0.06, -D / 2 - 0.06, D / 2 + 0.06)
+TRX0, TRX1 = -3.95, -W / 2 - 0.06           # 구덩이 x (집 벽 바로 바깥)
+TRY0, TRY1 = -2.0, 1.7                      # 구덩이 y: 북쪽 끝(1.7, 땅높이)에서 남쪽으로 내려간다
+CELLAR_DOOR = (-1.9, -1.1)                  # 서쪽 벽 문 (y)
+slab(g0, 'grass', (0, 0, -0.1), (LOT_W, LOT_D, 0.2), [HOLE_HOUSE, (TRX0, TRX1, TRY0, TRY1)])
+gB = group('basement', -1)
+BIX, BIY = W / 2 - 0.3, D / 2 - 0.3         # 안쪽 반 치수
+box(gB, 'stone2', (0, 0, BZ - 0.05), (W + 0.12, D + 0.12, 0.1))                                  # 바닥
+for sgn in (-1, 1):                                                                              # 남·북 벽
+    box(gB, 'stone', (0, sgn * (BIY + 0.18), (BZ - 0.03) / 2), (W + 0.12, 0.36, -BZ - 0.03 + 0.0))
+box(gB, 'stone', (BIX + 0.18, 0, (BZ - 0.03) / 2), (0.36, D + 0.12, -BZ - 0.03))                 # 동벽
+for y0, y1 in subtract((-D / 2 - 0.06, D / 2 + 0.06), [CELLAR_DOOR]):                           # 서벽 (문 구멍)
+    box(gB, 'stone', (-BIX - 0.18, (y0 + y1) / 2, (BZ - 0.03) / 2), (0.36, y1 - y0, -BZ - 0.03))
+box(gB, 'stone', (-BIX - 0.18, sum(CELLAR_DOOR) / 2, -0.35), (0.36, CELLAR_DOOR[1] - CELLAR_DOOR[0], 0.6))   # 문 위 인방
+for (x, y) in ((-1.0, -0.8), (1.0, 0.8)):                                                        # 나무 기둥 둘
+    box(gB, 'beam', (x, y, (BZ - 0.03) / 2), (0.24, 0.24, -BZ - 0.03))
+cyl(gB, 'dark', (0.0, 0.0, -0.35), 0.01, 0.6, seg=4)                                             # 등 하나
+sphere(gB, 'glowbulb', (0.0, 0.0, -0.72), 0.09, seg=8)
+box(gB, 'plank2', (2.0, -1.5, BZ + 0.25), (0.6, 0.6, 0.5))                                       # 상자 하나
+anchor('cellar', (0.0, 1.2, BZ + 1.4))
+# 구덩이: 돌계단(북→남으로 내려감) + 바닥 + 서쪽·남쪽 옹벽(땅 위 0.5 m 난간)
+gC0 = group('cellar_stairs', 0)
+stairs(gC0, ['stone', 'stone2'], TRX0 + 0.08, TRX1, TRY1, CELLAR_DOOR[1] + 0.0, 0.0, BZ, 12, base=BZ - 0.1)   # 역방향: 북(땅)→남(바닥)
+box(gC0, 'stone2', ((TRX0 + 0.08 + TRX1) / 2, (TRY0 + CELLAR_DOOR[1]) / 2, BZ - 0.05), (TRX1 - TRX0 - 0.08, CELLAR_DOOR[1] - TRY0, 0.1))
+box(gC0, 'stone', (TRX0 - 0.06, (TRY0 + TRY1) / 2, (BZ - 0.1 + 0.5) / 2), (0.2, TRY1 - TRY0 + 0.3, 0.6 - BZ))
+box(gC0, 'stone', ((TRX0 + TRX1) / 2 - 0.06, TRY0 - 0.08, (BZ - 0.1 + 0.5) / 2), (TRX1 - TRX0 + 0.3, 0.2, 0.6 - BZ))
 box(g0, 'grass2', (0, -D / 2 - 0.9, -0.005), (1.2, 1.4, 0.02))           # 문 앞 흙길 자국
 box(g0, 'stone2', (0, 0, 0.0), (W + 0.12, D + 0.12, 0.06))                # 주춧돌 띠
 # 돌길: 문(x≈0.8) 앞에서 남쪽 터 끝까지, 납작한 돌을 엇갈려
@@ -379,6 +467,8 @@ e = 0.08
 rail((-W / 2 + e, -D / 2 + e), (XA, -D / 2 + e))
 rail((-W / 2 + e, -D / 2 + e), (-W / 2 + e, D / 2 - e))
 rail((-W / 2 + e, D / 2 - e), (XA, D / 2 - e))
+for p0, p1 in RAIL_LATER:          # 계단 머리 둘레
+    rail(p0, p1, h=0.85)
 
 def chair(g, x, y, z, face=0.0, col='plank'):
     R = Matrix.Rotation(face, 4, 'Z')
@@ -479,10 +569,14 @@ def table(g, x, y, z, r=0.36):
     cyl(g, 'plank', (x, y, z + 0.74), r, 0.05, seg=16)
     cyl(g, 'beam', (x, y, z + 0.37), 0.05, 0.72, seg=8)
     cyl(g, 'beam', (x, y, z + 0.03), 0.22, 0.05, seg=10)
-for (x, y) in [(-2.0, -1.0), (-0.6, -0.2), (-2.0, 0.8)]:
+for (x, y, ns) in [(-1.5, -1.3, True), (-0.6, -0.2, False), (-1.0, 1.2, False)]:   # 서쪽 벽은 계단 자리: 탁자를 안쪽으로, 첫 탁자 의자는 앞뒤로
     table(g1, x, y, Zf)
-    chair(g1, x - 0.6, y, Zf, math.pi / 2, 'plank2')
-    chair(g1, x + 0.6, y, Zf, -math.pi / 2, 'plank2')
+    if ns:
+        chair(g1, x, y - 0.6, Zf, 0.0, 'plank2')
+        chair(g1, x, y + 0.6, Zf, math.pi, 'plank2')
+    else:
+        chair(g1, x - 0.6, y, Zf, math.pi / 2, 'plank2')
+        chair(g1, x + 0.6, y, Zf, -math.pi / 2, 'plank2')
     cyl(g1, 'cream', (x + 0.12, y, Zf + 0.81), 0.06, 0.09, seg=10)
     cyl(g1, 'coffee', (x + 0.12, y, Zf + 0.853), 0.05, 0.005, seg=10)
 # 펜던트 등
@@ -570,15 +664,15 @@ for i in range(4):
 for i, c in enumerate(['jar', 'night', 'jar']):
     cyl(g2, c, (-0.75 + i * 0.13, -1.3, Zf2 + 0.43), 0.045, 0.12, seg=8)
 cyl(g2, 'jar', (-0.45, -1.2, Zf2 + 0.45), 0.06, 0.16, seg=8)
-for i in range(3):
-    box(g2, 'cream' if i % 2 else 'paper', (-W / 2 + T + 0.12, 1.6 - i * 0.12, Zf2 + 0.45), (0.04, 0.6 - i * 0.08, 0.8 - i * 0.12), rot=(0, -0.15, 0))
-# 긴 두루마리 연표 (왼쪽 벽 안쪽)
-xw = -W / 2 + T + 0.06
-box(g2, 'paper', (xw, 0.2, Zf2 + 1.55), (0.02, 3.2, 0.62))
-for i in range(9):
-    box(g2, 'rule' if i % 2 else 'sage', (xw + 0.01, -1.2 + i * 0.35, Zf2 + 1.55), (0.01, 0.22, 0.05 + 0.04 * (i % 3)))
+for i in range(3):   # 기댄 캔버스 — 남쪽 벽 (서쪽 벽은 계단 자리)
+    box(g2, 'cream' if i % 2 else 'paper', (-1.2, -D / 2 + T + 0.12 + i * 0.12, Zf2 + 0.45), (0.6 - i * 0.08, 0.04, 0.8 - i * 0.12), rot=(0.15, 0, 0))
+# 긴 두루마리 연표 (화실 뒷벽 안쪽 — 서쪽 벽은 계단 자리)
+yw = D / 2 - T - 0.06
+box(g2, 'paper', (-1.3, yw, Zf2 + 1.55), (2.6, 0.02, 0.62))
+for i in range(7):
+    box(g2, 'rule' if i % 2 else 'sage', (-2.35 + i * 0.35, yw - 0.01, Zf2 + 1.55), (0.22, 0.01, 0.05 + 0.04 * (i % 3)))
 for z in (Zf2 + 1.87, Zf2 + 1.23):
-    cyl(g2, 'beam', (xw + 0.02, 0.2, z), 0.03, 3.35, axis='Y', seg=6)
+    cyl(g2, 'beam', (-1.3, yw - 0.02, z), 0.03, 2.75, axis='X', seg=6)
 # 공방: 작업대 + 서랍, 타공판 + 공구, 스탠드, 상자
 bx, by = 1.75, D / 2 - T - 0.45
 box(g2, 'plank', (bx, by, Zf2 + 0.9), (1.9, 0.75, 0.08))
@@ -604,7 +698,7 @@ box(g2, 'cream', (1.35, -1.1, Zf2 + 0.785), (0.5, 0.34, 0.03))
 box(g2, 'rule', (1.35, -1.1, Zf2 + 0.802), (0.01, 0.34, 0.005))
 cyl(g2, 'plank2', (1.4, -1.65, Zf2 + 0.45), 0.17, 0.04, seg=12)
 cyl(g2, 'beam', (1.4, -1.65, Zf2 + 0.22), 0.04, 0.44, seg=6)
-anchor('atelier', (-1.6, 0.2, Zf2 + 1.6))
+anchor('atelier', (-1.3, D / 2 - 0.5, Zf2 + 1.6))
 anchor('shop', (1.8, 1.4, Zf2 + 1.5))
 anchor('desk', (1.4, -1.1, Zf2 + 1.2))
 
