@@ -269,15 +269,26 @@ FAMILY = {'log2': 'log', 'plank2': 'plank', 'wood2': 'beam', 'cream': 'plaster',
 COLOR_SIZE = {'log': 1024, 'plank': 1024, 'floor': 1024, 'shingle': 1024, 'stone': 1024, 'grass': 1024, 'plaster': 1024}
 
 
-def make_all(colors, out_dir):
+def make_all(colors, out_dir, asset_dir=None):
     """colors: 키→'#rrggbb'. out_dir 에 <키>.png(색), <키>_n.png(법선), <키>_orm.png(거칠기) 를 쓰고
-    {키: (색 경로, 타일/m, 세로결, 법선 경로, orm 경로)} 를 돌려준다. 변형(FAMILY)은 원본 키의 법선·orm 을 가리킨다."""
+    {키: (색 경로, 타일/m, 세로결, 법선 경로, orm 경로)} 를 돌려준다. 변형(FAMILY)은 원본 키의 법선·orm 을 가리킨다.
+    asset_dir/textures/<키>.png 가 있으면(손그림·사진 텍스처, building/assets/README.md) 생성 대신 그 그림을 쓴다 —
+    <키>_n.png·<키>_orm.png 도 있으면 같이, 없으면 생성한 법선·거칠기를 쓴다."""
     import os
-    out = {}; maps = {}
+    out = {}; maps = {}; custom = {}
     for key, (fn, tiles, swap, nstr) in RECIPES.items():
         if key not in colors:
             continue
         img, h, r = fn(colors[key])
+        if asset_dir:
+            cp = os.path.join(asset_dir, 'textures', key + '.png')
+            if os.path.exists(cp):
+                img = Image.open(cp).convert('RGB'); custom[key] = True
+                cn, co = cp[:-4] + '_n.png', cp[:-4] + '_orm.png'
+                if os.path.exists(cn) and os.path.exists(co):
+                    path = os.path.join(out_dir, key + '.png'); img.save(path)
+                    out[key] = (path, tiles, swap, cn, co); maps[key] = (cn, co)
+                    continue
         cs = COLOR_SIZE.get(key, 512)
         if img.size[0] != cs:
             img = img.resize((cs, cs), Image.LANCZOS)
@@ -292,10 +303,14 @@ def make_all(colors, out_dir):
             maps[key] = (np_, op)
         out[key] = [path, tiles, swap, None, None]
     for key in out:
+        if isinstance(out[key], tuple):
+            continue
         fam = FAMILY.get(key, key)
         if fam in maps:
             out[key][3], out[key][4] = maps[fam]
         out[key] = tuple(out[key])
+    if custom:
+        print('CUSTOM TEXTURES', sorted(custom))
     return out
 
 

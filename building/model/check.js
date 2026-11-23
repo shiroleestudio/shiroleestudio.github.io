@@ -42,11 +42,10 @@ srv.listen(0, async () => {
     console.log(`[${name}] ${w}x${h}`);
     const st = await page.evaluate(() => {
       const bar = document.querySelector('.bar'), r = bar.getBoundingClientRect();
-      return { walking: window.__house.walking, barBottom: r.bottom, inner: innerHeight, btn: document.querySelector('[data-walk]').textContent, joy: !!document.getElementById('joy') };
+      return { walking: window.__house.walking, barBottom: r.bottom, inner: innerHeight, joy: !!document.getElementById('joy') };
     });
     if (!st.walking) bad('걷기가 기본이 아님');
     if (st.barBottom > st.inner + 1) bad(`하단 버튼 줄이 화면 밖 (${st.barBottom.toFixed(0)} > ${st.inner})`);
-    if (st.btn !== '둘러보기') bad(`단추 글자 ${st.btn}`);
     await shot(page, path.join(outDir, `${name}-start.png`));
     if (name === 'pc-wide') {
       for (const [label, x, y, z, yaw] of SPOTS) {
@@ -66,15 +65,25 @@ srv.listen(0, async () => {
       const f1 = await shot(page, path.join(outDir, 'blackhole-1.png')); await page.waitForTimeout(700);
       const f2 = await shot(page, path.join(outDir, 'blackhole-2.png'));
       if (f1.equals(f2)) bad('블랙홀이 움직이지 않음');
+      // 실제로 그려졌는지: 캡처 가운데 띠에 밝은 화소(원반)와 아주 어두운 화소(지평선)가 함께 있어야 한다
+      // (WebGL 캔버스는 그린 뒤 버퍼를 비워 drawImage 로 읽을 수 없으니, 스크린샷 PNG 를 페이지 안에서 풀어 센다)
+      const bright = await page.evaluate((b64) => new Promise((res) => {
+        const im = new Image(); im.onload = () => {
+          const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+          const y0 = Math.floor(im.height * 0.45), d = x.getImageData(0, y0, im.width, Math.max(1, Math.floor(im.height * 0.1))).data; let hi = 0, lo = 0;
+          for (let i = 0; i < d.length; i += 4) { const m = Math.max(d[i], d[i + 1], d[i + 2]); if (m > 180) hi++; if (m < 25) lo++; }
+          res({ hi, lo });
+        }; im.src = 'data:image/png;base64,' + b64;
+      }), f2.toString('base64'));
+      if (bright.hi < 50 || bright.lo < 50) bad(`블랙홀이 안 보임 (밝은 화소 ${bright.hi}, 어두운 화소 ${bright.lo})`);
       // 멍: 조작이 없으면 배경이 사라진다 (검사에서는 0.3초 뒤부터 1초에 걸쳐)
       await page.evaluate(() => { window.__house.idle(0.3, 1.0); window.__house.teleport(1.2, -2.6, 1.6, 0.5); });
-      await page.waitForTimeout(1800);
-      const fd = await page.evaluate(() => window.__house.fade);
+      const fd = await page.waitForFunction(() => window.__house.fade >= 0.99, null, { timeout: 15000 }).then(() => 1).catch(() => page.evaluate(() => window.__house.fade));   // 헤드리스는 한 장에 1~2초 걸리니 시간이 아니라 값으로 기다린다
       if (fd < 0.99) bad(`멍 때려도 배경이 안 사라짐 (fade ${fd})`);
       await shot(page, path.join(outDir, 'blackhole-idle.png'));
       await page.evaluate(() => window.__house.idle(6, 14));
-      await page.keyboard.down('KeyA'); await page.waitForTimeout(100); await page.keyboard.up('KeyA'); await page.waitForTimeout(1200);
-      const fd2 = await page.evaluate(() => window.__house.fade);
+      await page.keyboard.down('KeyA'); await page.waitForTimeout(100); await page.keyboard.up('KeyA');
+      const fd2 = await page.waitForFunction(() => window.__house.fade <= 0.01, null, { timeout: 15000 }).then(() => 0).catch(() => page.evaluate(() => window.__house.fade));
       if (fd2 > 0.01) bad(`조작했는데 배경이 안 돌아옴 (fade ${fd2})`);
       for (const [label, x, y, z] of WALLS) {
         const ok = await page.evaluate(([x, y, z]) => { const H = window.__house; H.teleport(0, y, 0); H.player.y = y; return H.canStand(x, z); }, [x, y, z]);
@@ -87,12 +96,6 @@ srv.listen(0, async () => {
       if (pz > 6.5) bad(`앞으로 걸어도 움직이지 않음 (z ${pz.toFixed(2)})`);       // 헤드리스는 느려서 거리는 재지 않는다
       const doorOk = await page.evaluate(() => { const H = window.__house; H.teleport(0.8, 0.0, 2.8); return [2.6, 2.45, 2.3, 2.0].every((z) => H.canStand(0.8, z)); });   // 문턱(벽 두께 구간 2.37~2.56)도 지나야 한다
       if (!doorOk) bad('현관 문턱을 지날 수 없음');
-      // 둘러보기 전환·복귀
-      await page.evaluate(() => document.querySelector('[data-walk]').click()); await page.waitForTimeout(300);   // page.click 은 화면이 '안정'되길 기다리다 무거운 화면에서 시간이 넘친다
-      const orbit = await page.evaluate(() => !window.__house.walking && document.querySelector('[data-walk]').textContent);
-      if (orbit !== '걷기') bad('둘러보기 전환 실패');
-      await shot(page, path.join(outDir, 'orbit.png'));
-      await page.evaluate(() => document.querySelector('[data-walk]').click()); await page.waitForTimeout(300);   // page.click 은 화면이 '안정'되길 기다리다 무거운 화면에서 시간이 넘친다
     }
     if (logs.length) { for (const l of logs) bad(l); }
     await ctx.close();

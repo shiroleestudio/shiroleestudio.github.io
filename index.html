@@ -34,7 +34,7 @@
 <main id="main" class="home">
 <section class="house" aria-labelledby="hi">
   <h1 id="hi" class="sr">이시로스튜디오: 아기토끼 이시로와 함께하는 작은 공방</h1>
-  <p class="sr">1층 찻집, 2층 화실과 공방, 3층 다락의 놀이방과 천문대, 루프탑, 그리고 블랙홀이 보이는 관측창이 있는 지하실. 방에 다가가 이름을 누르면 그 작품으로 들어갑니다.</p>
+  <p class="sr">1층 찻집, 2층 화실과 공방, 3층 다락의 놀이방과 천문대, 루프탑, 그리고 한가운데 블랙홀이 도는 지하실. 방에 다가가 이름을 누르면 그 작품으로 들어갑니다.</p>
   <div class="stage" id="stage">
     <canvas id="scene" aria-label="시로가 사는 3층 오두막. 1인칭으로 걸어 다니며 방에 다가가면 작품 이름이 뜬다. 둘러보기 단추로 돌려 볼 수 있다" role="img"></canvas>
     <div class="labels" id="labels"></div>
@@ -63,18 +63,7 @@
     </ul>
   </nav>
   <div class="bar">
-    <div class="floors" role="group" aria-label="보이는 층">
-      <button type="button" data-floor="0" aria-pressed="true">전체</button>
-      <button type="button" data-floor="1" aria-pressed="false">1층</button>
-      <button type="button" data-floor="2" aria-pressed="false">2층</button>
-      <button type="button" data-floor="3" aria-pressed="false">3층</button>
-    </div>
-    <div class="zoom" role="group" aria-label="확대·축소">
-      <button type="button" data-zoom="out" aria-label="축소">−</button>
-      <button type="button" data-zoom="in" aria-label="확대">+</button>
-    </div>
-    <button type="button" class="walk" data-walk aria-pressed="false">걷기</button>
-    <p class="hint">끌어서 돌리고, 두 손가락이나 휠로 확대해요</p>
+    <p class="hint">클릭하면 마우스로 둘러보고(Esc 로 풀기), WASD·방향키로 걸어요. 방에 다가가면 이름이 떠요</p>
   </div>
 </section>
 </main>

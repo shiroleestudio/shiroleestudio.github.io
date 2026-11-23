@@ -3,11 +3,10 @@
 // 모델: house.glb (model/build_house.py 로 Blender 에서 만든다. 콘셉트 그림은 두호의 나노바나나 초안).
 // 그림체(3단계 그래픽 일신, 두호 2026-11-23: '8번 출구'급 실사 + 몽환적 판타지 동화풍): PBR 실사 재질(색·법선·거칠기 지도, 모델에 든 것) + 구운 구석 그늘(정점색)
 // + 해 그림자맵 + 하늘 환경광(PMREM) + 후처리(블룸·거리 안개·ACES 톤·색 보정·비네트·필름 그레인·약한 색수차). 배경은 셰이더 하늘(낮: 구름, 밤: 별·달).
-// 손가락을 따라 상하·좌우로 돈다. 카메라를 향한 벽·지붕은 걷어 낸다(단면). 방 이름표는 건물 밖 양옆에 세우고 인출선으로 잇는다(HTML 링크).
-// 기본은 1인칭 걷기(두호 2026-11-23: 게임처럼 이용하는 사이트): 마당에서 시작해 현관으로 들어가고, 서쪽 벽 계단으로 2층·루프탑, 바깥 돌계단으로 지하실에 간다 (아래 '1인칭 걷기').
+// 1인칭 걷기만 있다(두호 2026-11-23: 게임처럼 이용하는 사이트, 조감도·둘러보기 모드는 뺐다): 마당에서 시작해 현관으로 들어가고, 서쪽 벽 계단으로 2층·루프탑,
+// 바깥 돌계단으로 지하실에 간다 (아래 '1인칭 걷기'). 메뉴(방 이름표 = 링크)는 그 방 가까이 갔을 때만 뜬다.
 // 지하실 한가운데에는 캠프파이어처럼 블랙홀이 떠서 돈다(blackhole.js, '블랙홀멍'). 보일 때만 저해상도 버퍼에 그리고, 방은 그 주황빛으로 물든다.
 // 가만히 있으면(조작 없음) 방이 서서히 어두워져 블랙홀만 남는다. 조작하면 바로 돌아온다.
-// '둘러보기' 단추로 예전의 돌려 보는 모드(층 떼어 보기·확대)가 된다.
 // 캐릭터는 아직 없다. TODO(character-sheet).
 import * as THREE from 'three';
 import { GLTFLoader } from '../assets/vendor/three/addons/loaders/GLTFLoader.js';
@@ -16,7 +15,6 @@ import { createBlackHole, BH } from './blackhole.js?v=0.11.0';   // 지하실 �
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('scene');
 const labelLayer = document.getElementById('labels');
-const floorButtons = [...document.querySelectorAll('[data-floor]')];
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const darkQuery = matchMedia('(prefers-color-scheme: dark)');
 
@@ -232,16 +230,8 @@ function applyTheme() {
 }
 
 // ---- 모델 ----
-const DIRS = { S: new THREE.Vector3(0, 0, 1), N: new THREE.Vector3(0, 0, -1), E: new THREE.Vector3(1, 0, 0), W: new THREE.Vector3(-1, 0, 0) };
-const cuttables = [];   // { obj, dir }
-const floorNodes = [];  // { obj, floor }
-const baseNodes = [];   // 땅·바깥 소품: 1층만 볼 때와 전체일 때만
-const cellarNodes = []; // 지하실 (floor -1)
-const anchors = {};
-const pickables = [];
-const center = new THREE.Vector3(0, 4.2, 0);
-let radius = 26, fitR = 6, rowsMode = false;
-let house = null, door = null;   // door: 현관 문짝 (원점이 경첩, 걷기 모드에서 연다)
+const anchors = {};              // anchor_<방id>: 이름표 자리
+let house = null, door = null;   // door: 현관 문짝 (원점이 경첩, 가까이 가면 연다)
 let dirty = true;
 let hemiBase = 0.55;         // 테마가 정한 하늘빛 세기 (지하실에서는 0.25 배로 어둡게)
 let fogBase = 0.011;          // 테마가 정한 안개 농도 (지하실에서는 0)
@@ -281,30 +271,14 @@ new GLTFLoader().load(new URL('house.glb', import.meta.url).href, (gltf) => {
       const vc = !!o.geometry.getAttribute('color');
       o.material = Array.isArray(o.material) ? o.material.map((m) => materialize(m, vc)) : materialize(o.material, vc);
       o.castShadow = o.receiveShadow = true;
-      pickables.push(o);
     }
-    const ud = o.userData || {};
-    if (ud.cut && DIRS[ud.cut]) cuttables.push({ obj: o, dir: DIRS[ud.cut] });
-    if (typeof ud.floor === 'number' && ud.floor > 0) floorNodes.push({ obj: o, floor: ud.floor });
-    if (ud.floor === 0) baseNodes.push(o);
-    if (ud.floor === -1) cellarNodes.push(o);          // 지하실: 둘러보기(단면)에서는 숨기고 걷기에서만
     if (o.name.startsWith('anchor_')) anchors[o.name.slice(7)] = o;
     if (o.name === 'door') door = o;
   });
   scene.add(house);
-  // 화면 맞춤은 집(1~3층)만 — 둘레의 터·언덕(floor 0)은 배경이라 재지 않는다
-  const box = new THREE.Box3();
-  for (const { obj } of floorNodes) box.expandByObject(obj);
-  const sph = box.getBoundingSphere(new THREE.Sphere());
-  center.copy(sph.center); center.y -= 0.3;
-  fitR = sph.radius;
-  sun.target.position.set(center.x, 0, center.z);
-  targetY = lookCur = center.y;
-  showFloors(shownFloor);
+  sun.target.position.set(0, 0, 0);
   loading.remove();
-  setWalking(!new URLSearchParams(location.search).has('view'));   // 기본은 걷기. ?view 가 있으면 둘러보기
-  resize();
-  dirty = true;
+  startWalk();
 }, undefined, () => {
   loading.textContent = '3D 모델을 불러오지 못했어요. 아래 목록에서 방을 고르세요.';
   stage.classList.add('failed');
@@ -322,150 +296,51 @@ const labelEls = ROOMS.map((r) => {
   return a;
 });
 
-// ---- 층 고르기: 기본은 집 전체, 층을 고르면 그 층만 떼어 보여 준다 ----
-let shownFloor = 0;     // 0 = 전체
-let targetY = center.y;
-let zoom = 1, zoomTarget = 1;
-const floorOn = (f) => shownFloor === 0 || f === shownFloor;
-function showFloors(n) {
-  shownFloor = n;
-  for (const b of floorButtons) b.setAttribute('aria-pressed', String(Number(b.dataset.floor) === n));
-  for (const { obj, floor } of floorNodes) obj.visible = floorOn(floor);
-  for (const o of baseNodes) o.visible = n <= 1;
-  for (const o of cellarNodes) o.visible = walking;
-  targetY = center.y; zoomTarget = 1;
-  if (n > 0 && house) {
-    const box = new THREE.Box3();
-    for (const { obj, floor } of floorNodes) if (floor === n) box.expandByObject(obj);
-    if (!box.isEmpty()) {
-      const sph = box.getBoundingSphere(new THREE.Sphere());
-      targetY = sph.center.y;
-      zoomTarget = Math.min(1, Math.max(0.55, sph.radius / fitR));
-    }
-  }
-  dirty = true;
-}
-for (const b of floorButtons) b.addEventListener('click', () => showFloors(Number(b.dataset.floor)));
-
-// ---- 입력: 손가락(마우스)을 따라 상하·좌우 회전, 탭 → 가장 가까운 방 ----
-let yaw = 0.75, yawVel = 0;             // 처음엔 오른쪽 앞에서 (콘셉트 그림의 각도)
-let pitch = 0.36, pitchVel = 0;         // 위아래 각도. 땅 바로 위 ~ 거의 내려다보기
-const PITCH_MIN = 0.04, PITCH_MAX = 1.0;
-const clampPitch = (p) => Math.min(PITCH_MAX, Math.max(PITCH_MIN, p));
-// 확대·축소: 두 손가락 벌리기/오므리기, 마우스 휠, +/− 버튼
-let lastRR = NaN;
-let userZoom = 1;                       // 거리 배율. 작을수록 가까이
-const ZOOM_MIN = 0.45, ZOOM_MAX = 1.8;
-function zoomBy(f) { userZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, userZoom * f)); dirty = true; }
-let dragging = false, lastX = 0, lastY = 0, moved = 0, downAt = 0;
-const pointers = new Map(); let pinchD = 0;
-const pinchDist = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+// ---- 입력 (1인칭): 왼쪽 반 터치 = 조이스틱, 오른쪽 반·마우스 = 둘러보기. 탭·클릭 = 가까운 방 열기 ----
+let lastX = 0, lastY = 0, moved = 0, downAt = 0;
 stage.addEventListener('pointerdown', (e) => {
   if (e.target.closest('.callout')) return;
   touched();
-  if (walking) {                       // 1인칭: 왼쪽 반 터치 = 조이스틱, 그 밖(오른쪽·마우스) = 끌어서 둘러보기
-    try { stage.setPointerCapture(e.pointerId); } catch (_) { /* 합성 이벤트 */ }
-    const b = stage.getBoundingClientRect();
-    if (e.pointerType === 'mouse' && !locked && canvas.requestPointerLock) {     // PC: 클릭하면 마우스가 잠기고 움직이는 대로 둘러본다 (Esc 로 풀림)
-      try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (_) { /* 미지원 */ }
-    }
-    if (e.pointerType !== 'mouse' && joyId === null && e.clientX - b.left < b.width / 2) {
-      joyId = e.pointerId; joyOrigin.x = e.clientX; joyOrigin.y = e.clientY; joy.f = joy.r = 0;
-      joyEl.hidden = false; joyEl.style.left = `${e.clientX - b.left}px`; joyEl.style.top = `${e.clientY - b.top}px`;
-      joyKnob.style.transform = 'translate(0px, 0px)';
-      return;
-    }
-    if (lookId !== null) return;
-    lookId = e.pointerId; lastX = e.clientX; lastY = e.clientY; moved = 0; downAt = performance.now();
+  try { stage.setPointerCapture(e.pointerId); } catch (_) { /* 합성 이벤트 */ }
+  const b = stage.getBoundingClientRect();
+  if (e.pointerType === 'mouse' && !locked && canvas.requestPointerLock) {     // PC: 클릭하면 마우스가 잠기고 움직이는 대로 둘러본다 (Esc 로 풀림)
+    try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (_) { /* 미지원 */ }
+  }
+  if (e.pointerType !== 'mouse' && joyId === null && e.clientX - b.left < b.width / 2) {
+    joyId = e.pointerId; joyOrigin.x = e.clientX; joyOrigin.y = e.clientY; joy.f = joy.r = 0;
+    joyEl.hidden = false; joyEl.style.left = `${e.clientX - b.left}px`; joyEl.style.top = `${e.clientY - b.top}px`;
+    joyKnob.style.transform = 'translate(0px, 0px)';
     return;
   }
-  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  stage.setPointerCapture(e.pointerId);
-  if (pointers.size === 2) { pinchD = pinchDist(); moved = 99; yawVel = pitchVel = 0; return; }
-  dragging = true; lastX = e.clientX; lastY = e.clientY; moved = 0; downAt = performance.now(); yawVel = pitchVel = 0;
+  if (lookId !== null) return;
+  lookId = e.pointerId; lastX = e.clientX; lastY = e.clientY; moved = 0; downAt = performance.now();
 });
 stage.addEventListener('pointermove', (e) => {
-  if (walking) {
-    if (e.pointerId === joyId || e.pointerId === lookId || locked) touched();
-    if (e.pointerId === joyId) {
-      const dx = e.clientX - joyOrigin.x, dy = e.clientY - joyOrigin.y;
-      const len = Math.hypot(dx, dy), k = len > JOY_R ? JOY_R / len : 1;
-      joy.r = (dx * k) / JOY_R; joy.f = -(dy * k) / JOY_R;               // 위로 밀면 앞으로
-      joyKnob.style.transform = `translate(${(dx * k).toFixed(0)}px, ${(dy * k).toFixed(0)}px)`;
-    } else if (e.pointerId === lookId || (locked && e.pointerType === 'mouse')) {
-      const dx = locked ? e.movementX : e.clientX - lastX, dy = locked ? e.movementY : e.clientY - lastY;
-      lastX = e.clientX; lastY = e.clientY; moved += Math.abs(dx) + Math.abs(dy);
-      const k = e.pointerType === 'mouse' ? (locked ? 0.0022 : 0.004) : 0.0022;   // 손가락·잠긴 마우스는 둔하게 (멀미)
-      wYaw -= dx * k; wPitch = Math.min(0.9, Math.max(-0.9, wPitch - dy * k * 0.7)); dirty = true;
-    }
-    return;
+  if (e.pointerId === joyId) {
+    touched();
+    const dx = e.clientX - joyOrigin.x, dy = e.clientY - joyOrigin.y;
+    const len = Math.hypot(dx, dy), k = len > JOY_R ? JOY_R / len : 1;
+    joy.r = (dx * k) / JOY_R; joy.f = -(dy * k) / JOY_R;               // 위로 밀면 앞으로
+    joyKnob.style.transform = `translate(${(dx * k).toFixed(0)}px, ${(dy * k).toFixed(0)}px)`;
+  } else if (e.pointerId === lookId || (locked && e.pointerType === 'mouse')) {
+    touched();
+    const dx = locked ? e.movementX : e.clientX - lastX, dy = locked ? e.movementY : e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY; moved += Math.abs(dx) + Math.abs(dy);
+    const k = e.pointerType === 'mouse' ? (locked ? 0.0022 : 0.004) : 0.0022;   // 손가락·잠긴 마우스는 둔하게 (멀미)
+    wYaw -= dx * k; wPitch = Math.min(0.9, Math.max(-0.9, wPitch - dy * k * 0.7)); dirty = true;
   }
-  if (!pointers.has(e.pointerId)) return;
-  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  if (pointers.size >= 2) {
-    const d = pinchDist();
-    if (pinchD > 0 && d > 0 && !walking) zoomBy(pinchD / d);
-    pinchD = d;
-    return;
-  }
-  if (!dragging) return;
-  const dx = e.clientX - lastX, dy = e.clientY - lastY;
-  lastX = e.clientX; lastY = e.clientY; moved += Math.abs(dx) + Math.abs(dy);
-  const d = -dx * 0.008, dp = dy * 0.006;
-  yaw += d; yawVel = d;
-  const np = clampPitch(pitch + dp); pitchVel = np - pitch; pitch = np;
-  dirty = true;
 });
-function release(e) {
-  pointers.delete(e.pointerId);
-  if (pointers.size === 1) {          // 두 손가락 중 하나를 떼면 남은 손가락으로 이어서 돌린다
-    const [p] = pointers.values(); lastX = p.x; lastY = p.y; dragging = true; pinchD = 0;
-    return false;
-  }
-  const was = dragging; dragging = false; pinchD = 0;
-  return was;
-}
 function walkRelease(e) {
   if (e.pointerId === joyId) { joyId = null; joy.f = joy.r = 0; joyEl.hidden = true; return false; }
   if (e.pointerId === lookId) { lookId = null; return true; }
   return false;
 }
-stage.addEventListener('pointerup', (e) => {
-  if (walking) { if (walkRelease(e) && moved < 8 && performance.now() - downAt < 400) openNear(); return; }
-  if (!pointers.has(e.pointerId)) return;
-  if (release(e) && moved < 8 && performance.now() - downAt < 400) pick(e);
-});
-stage.addEventListener('pointercancel', (e) => { if (walking) walkRelease(e); else release(e); });
-// iOS Safari: 무대 위 두 손가락은 페이지 확대가 아니라 집 확대로
+stage.addEventListener('pointerup', (e) => { if (walkRelease(e) && moved < 8 && performance.now() - downAt < 400) openNear(); });
+stage.addEventListener('pointercancel', walkRelease);
+// iOS Safari: 무대 위 두 손가락은 페이지 확대가 아니다
 stage.addEventListener('gesturestart', (e) => e.preventDefault());
-stage.addEventListener('wheel', (e) => {
-  e.preventDefault();
-  if (walking) return;
-  zoomBy(Math.exp(e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0015)));
-}, { passive: false });
-for (const b of document.querySelectorAll('[data-zoom]')) b.addEventListener('click', () => zoomBy(b.dataset.zoom === 'in' ? 0.8 : 1.25));
-const ray = new THREE.Raycaster(); const ndc = new THREE.Vector2();
+stage.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
 const wp = new THREE.Vector3();
-function pick(e) {
-  if (!house) return;
-  const b = canvas.getBoundingClientRect();
-  ndc.set(((e.clientX - b.left) / b.width) * 2 - 1, -((e.clientY - b.top) / b.height) * 2 + 1);
-  ray.setFromCamera(ndc, camera);
-  const hit = ray.intersectObjects(pickables.filter(visibleChain), false)[0];
-  if (!hit) return;
-  let best = null, bd = 2.6;
-  for (const r of ROOMS) {
-    const a = anchors[r.id];
-    if (!a || !floorOn(r.floor)) continue;
-    const d = a.getWorldPosition(wp).distanceTo(hit.point);
-    if (d < bd) { bd = d; best = r; }
-  }
-  if (best) location.href = best.href;
-}
-function visibleChain(o) {
-  for (let p = o; p; p = p.parent) if (!p.visible) return false;
-  return true;
-}
 
 // ---- 크기 ----
 function resize() {
@@ -479,16 +354,7 @@ function resize() {
   bh.setSize(w * pr, h * pr, Math.min(0.5, 720 / (w * pr)));                      // 블랙홀 버퍼: 화면의 1/2, 폭 720 화소 상한
   post.uniforms.texel.value.set(1 / (w * pr), 1 / (h * pr));
   camera.aspect = w / h;
-  camera.fov = walking ? (camera.aspect < 1 ? 85 : 62) : 28;
-  const vf = THREE.MathUtils.degToRad(camera.fov) / 2;
-  const hf = Math.atan(Math.tan(vf) * camera.aspect);
-  // 건물은 가운데 폭의 일부만 쓰고, 양옆은 이름표 칸으로 비워 둔다
-  // 폰처럼 좁으면 이름표를 위아래 띠로 보내고 건물이 폭을 거의 다 쓴다
-  rowsMode = w < 520;
-  const hfit = Math.atan(Math.tan(hf) * (rowsMode ? 0.92 : w < 760 ? 0.5 : 0.52));
-  const vfit = Math.atan(Math.tan(vf) * (rowsMode ? 0.56 : 0.94));
-  radius = (fitR / Math.sin(Math.min(vfit, hfit))) * 0.86;
-  lastRR = NaN;
+  camera.fov = camera.aspect < 1 ? 85 : 62;                                        // 세로 화면은 시야를 넓게
   camera.updateProjectionMatrix();
   dirty = true;
 }
@@ -497,52 +363,24 @@ darkQuery.addEventListener('change', applyTheme);
 applyTheme();
 
 // ---- 매 프레임 ----
-const camDir = new THREE.Vector3(); const v = new THREE.Vector3();
-let lastYaw = NaN;
-let lookCur = center.y;
+const v = new THREE.Vector3();
 let lastT = performance.now();
 function frame() {
   const now = performance.now(); const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
-  if (walking) walkStep(dt);
-  else if (!dragging) {
-    if (Math.abs(yawVel) > 0.0003) { yaw += yawVel; yawVel *= 0.92; dirty = true; }
-    else if (!reduceMotion.matches && house) { yaw += 0.0011; dirty = true; }
-    if (Math.abs(pitchVel) > 0.0003) { pitch = clampPitch(pitch + pitchVel); pitchVel *= 0.9; dirty = true; }
-  }
-  if (Math.abs(targetY - lookCur) > 0.005) { lookCur += (targetY - lookCur) * 0.12; dirty = true; }
-  if (Math.abs(zoomTarget - zoom) > 0.002) { zoom += (zoomTarget - zoom) * 0.12; dirty = true; }
-  if (house && (dirty || yaw !== lastYaw)) {
-    lastYaw = yaw;
+  if (house) walkStep(dt);
+  if (house && dirty) {
     dirty = false;
-    const tgt = new THREE.Vector3(center.x, lookCur, center.z);
-    const rr = radius * zoom * userZoom;
-    if (!walking && rr !== lastRR) {    // 둘러보기: 가까이 가면 앞 클립면도 당긴다 (걷기는 setWalking 이 0.1 로 고정 — 안 그러면 0.8 m 안의 벽이 잘려 벽이 사라져 보인다)
-      lastRR = rr;
-      camera.near = Math.max(0.2, rr * 0.08); camera.far = rr + fitR * 3;
-      post.uniforms.near.value = camera.near; post.uniforms.far.value = camera.far;
-      camera.updateProjectionMatrix();
-    }
-    if (walking) {                    // 1인칭: 눈높이에서 보는 방향대로. 벽은 걷어 내지 않는다
-      camera.position.set(player.x, player.y + eyeH, player.z);
-      camera.rotation.set(wPitch, wYaw, 0, 'YXZ');   // 좌우(yaw) 먼저, 그 다음 위아래 — 기본 XYZ 면 고개를 든 채 돌 때 시선이 비스듬히 밀린다
-      camDir.set(-Math.sin(wYaw), 0, -Math.cos(wYaw));
-      camera.updateMatrixWorld(true);
-    } else {
-      camera.position.set(tgt.x + rr * Math.cos(pitch) * Math.sin(yaw), tgt.y + rr * Math.sin(pitch), tgt.z + rr * Math.cos(pitch) * Math.cos(yaw));
-      camera.lookAt(tgt);
-      camDir.subVectors(camera.position, tgt).setY(0).normalize();
-    }
-
-    for (const { obj, floor } of floorNodes) obj.visible = floorOn(floor);
-    for (const { obj, dir } of cuttables) if (obj.visible) obj.visible = walking || dir.dot(camDir) < 0.3;
-    if (walking) updateNear();
-    // 지하실 관측창의 블랙홀: 지하에 있고 창이 화면에 들어올 때만 그린다. 보이는 동안은 매 프레임(동작 줄이기와 무관 — 움직임이 내용이다)
-    const inCellar = walking && player.y < -1.0 && player.x > -3.1 && Math.abs(player.z) < 2.3;   // 지하실 안(문턱 포함). 바깥 돌계단에서는 벽 뒤라 안 보인다
+    camera.position.set(player.x, player.y + eyeH, player.z);   // 눈높이에서 보는 방향대로
+    camera.rotation.set(wPitch, wYaw, 0, 'YXZ');                 // 좌우(yaw) 먼저, 그 다음 위아래 — 기본 XYZ 면 고개를 든 채 돌 때 시선이 비스듬히 밀린다
+    camera.updateMatrixWorld(true);
+    updateNear();
+    // 지하실의 블랙홀: 지하에 있고 공이 화면에 들어올 때만 그린다. 보이는 동안은 매 프레임(동작 줄이기와 무관 — 움직임이 내용이다)
+    const inCellar = player.y < -1.0 && player.x > -3.1 && Math.abs(player.z) < 2.3;   // 지하실 안(문턱 포함). 바깥 돌계단에서는 벽 뒤라 안 보인다
     bhSphere.visible = inCellar;
     bhOn = inCellar && frustum.setFromProjectionMatrix(projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)).intersectsObject(bhSphere);
     bhLight.visible = inCellar; sun.visible = !inCellar;                       // 지하는 해가 안 든다. 하늘빛도 줄여 블랙홀이 돋보이게
     hemi.intensity = inCellar ? hemiBase * 0.25 : hemiBase;
-    if (inCellar) bhLight.intensity = 14 + 3.0 * Math.sin(now * 0.0021) + 1.5 * Math.sin(now * 0.0057 + 1.0) + 0.8 * Math.sin(now * 0.013);   // 모닥불처럼
+    if (inCellar) bhLight.intensity = 16 + 3.0 * Math.sin(now * 0.0021) + 1.5 * Math.sin(now * 0.0057 + 1.0) + 0.8 * Math.sin(now * 0.013);   // 모닥불처럼
     if (bhOn) bh.render(camera, now / 1000);
     // 멍: 지하실에서 조작이 없으면 방이 사라진다 (블랙홀 공이 안 보이면 지우지 않는다 — 깜깜해지기만 하니까)
     const idle = (now - lastInput) / 1000;
@@ -551,7 +389,7 @@ function frame() {
 
     // 1) 장면(HDR) 2) 블룸 3) 합성
     post.uniforms.time.value = reduceMotion.matches ? 0 : now / 1000;
-    post.uniforms.fogDensity.value = inCellar ? 0 : walking ? fogBase : fogBase * 0.35;   // 둘러보기는 멀리서 보니 안개를 줄인다
+    post.uniforms.fogDensity.value = inCellar ? 0 : fogBase;
     renderer.setRenderTarget(rtColor); renderer.clear(); renderer.render(scene, camera);
     composite();
 
@@ -568,15 +406,12 @@ function frame() {
 // 마우스는 클릭하면 잠겨 움직이는 대로 둘러본다(Esc 로 풀림). 잠기지 않으면 끌어서 돌린다.
 // three 좌표: 모델의 남쪽(정문)이 +z, 위가 +y. 집 발자국 ±3 × ±2.5, 현관은 x 0.35~1.25 의 남쪽 벽.
 // 발높이·충돌 수치는 model/build_house.py 의 계단(ST12·ST23·HOLE12·HOLE23)·지하(BZ·TRX·TRY·CELLAR_DOOR)와 같아야 한다.
-const walkBtn = document.querySelector('[data-walk]');
 const joyEl = document.getElementById('joy');              // 가상 조이스틱 (왼쪽 반을 누른 자리에 뜬다)
 const joyKnob = joyEl ? joyEl.firstElementChild : null;
 const JOY_R = 44;                                           // 스틱이 움직이는 반지름(px)
 const joy = { f: 0, r: 0 }, joyOrigin = { x: 0, y: 0 };
 let joyId = null, lookId = null, locked = false;
 const hintEl = document.querySelector('.bar .hint');
-const hintOrbit = hintEl ? hintEl.textContent : '';
-let walking = false;
 const START = new THREE.Vector3(0.8, 0, 6.6);     // 울타리 문 앞, 돌길 끝
 const player = START.clone();                     // y = 발 높이
 let wYaw = 0, wPitch = 0;                         // yaw 0 = 북쪽(집) 을 본다
@@ -629,7 +464,7 @@ function blocked(x, z, y) {
   const inside = Math.abs(x) < 2.7 && Math.abs(z) < 2.2;
   for (const r of OBST[lv]) if (inRect(x, z, r)) return true;
   if (lv === 'B') {
-    if (Math.hypot(x, z) < 0.9) return true;                                                    // 블랙홀 한가운데(지평선·안쪽 원반)로는 못 들어간다. 바깥 원반 가장자리는 머리 아래로 지난다
+    if (Math.hypot(x, z) < 1.1) return true;                                                    // 블랙홀 한가운데(지평선·안쪽 원반)로는 못 들어간다. 바깥 원반 가장자리는 머리 아래로 지난다
     if (inside) return false;
     if (x > TRX0 && x < TRX1 && z > -1.7 && z < 2.0) return false;                        // 구덩이
     if (x >= -3.06 && x <= -2.7 && z > CDOOR[0] && z < CDOOR[1]) return false;              // 문
@@ -697,158 +532,41 @@ function updateNear() {
   if (best !== nearRoom) { nearRoom = best; dirty = true; }
 }
 function openNear() { if (nearRoom) location.href = nearRoom.href; }
-function setWalking(on) {
-  walking = on;
-  if (on) { showFloors(0); player.copy(START); wYaw = 0; wPitch = 0.05; nearRoom = null; }
-  else { if (door) door.rotation.y = 0; if (document.exitPointerLock && document.pointerLockElement) document.exitPointerLock(); }
-  for (const o of cellarNodes) o.visible = on;
-  for (const b of floorButtons) b.disabled = on;
-  for (const b of document.querySelectorAll('[data-zoom]')) b.disabled = on;
-  if (walkBtn) { walkBtn.setAttribute('aria-pressed', String(on)); walkBtn.textContent = on ? '둘러보기' : '걷기'; }
-  if (joyEl) joyEl.hidden = true;
-  joyId = lookId = null; joy.f = joy.r = 0;
-  if (hintEl) hintEl.textContent = on ? (matchMedia('(hover: none)').matches ? '왼쪽을 누른 채 밀어 걷고, 오른쪽을 끌어 둘러봐요. 방에 다가가면 이름이 떠요' : '클릭하면 마우스로 둘러보고(Esc 로 풀기), WASD·방향키로 걸어요. 방에 다가가면 이름이 떠요') : hintOrbit;
-  stage.classList.toggle('walking', on);
-  if (on) { camera.near = 0.1; camera.far = 80; post.uniforms.near.value = 0.1; post.uniforms.far.value = 80; }
-  lastRR = NaN; keys.clear();
-  renderer.setPixelRatio(Math.min(devicePixelRatio, on ? 1.5 : 2));           // 걷는 동안은 조금 낮은 해상도로 — 프레임이 끊기면 멀미가 난다
-  resize();                                                                    // 시야각(걷기: 세로 화면 85°, 가로 62°)·크기 다시
+function startWalk() {
+  player.copy(START); wYaw = 0; wPitch = 0.05; nearRoom = null;
+  stage.classList.add('walking');
+  camera.near = 0.1; camera.far = 80; post.uniforms.near.value = 0.1; post.uniforms.far.value = 80;
+  if (hintEl) hintEl.textContent = matchMedia('(hover: none)').matches ? '왼쪽을 누른 채 밀어 걷고, 오른쪽을 끌어 둘러봐요. 방에 다가가면 이름이 떠요' : '클릭하면 마우스로 둘러보고(Esc 로 풀기), WASD·방향키로 걸어요. 방에 다가가면 이름이 떠요';
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));                     // 조금 낮은 해상도로 — 프레임이 끊기면 멀미가 난다
+  resize();
   dirty = true;
 }
-if (walkBtn) walkBtn.addEventListener('click', () => setWalking(!walking));
 document.addEventListener('pointerlockchange', () => { locked = document.pointerLockElement === canvas; stage.classList.toggle('locked', locked); });
 const KEYMAP = { KeyW: 'f', ArrowUp: 'f', KeyS: 'b', ArrowDown: 'b', KeyA: 'l', ArrowLeft: 'l', KeyD: 'r', ArrowRight: 'r' };
 addEventListener('keydown', (e) => {
-  if (!walking || e.target.closest('input, textarea, button, a')) return;
+  if (e.target.closest('input, textarea, button, a')) return;
   if (e.code === 'KeyE' || e.code === 'Enter') { openNear(); return; }
   if (KEYMAP[e.code]) { keys.add(KEYMAP[e.code]); e.preventDefault(); touched(); }
 });
 addEventListener('keyup', (e) => { if (KEYMAP[e.code]) keys.delete(KEYMAP[e.code]); });
 addEventListener('blur', () => keys.clear());
 // 검토 스크립트(model/check.js)가 쓰는 손잡이. 사이트 기능이 아니다
-window.__house = { get player() { return player; }, get walking() { return walking; }, get near() { return nearRoom; }, get blackhole() { return bhOn; }, get fade() { return fade; }, idle(start, dur) { IDLE.start = start; IDLE.dur = dur; }, setWalking, teleport(x, y, z, yaw) { player.set(x, y, z); if (yaw !== undefined) wYaw = yaw; touched(); dirty = true; }, canStand, surfaceAt, look(yaw, pitch) { wYaw = yaw; wPitch = pitch; dirty = true; } };
+window.__house = { get player() { return player; }, get walking() { return true; }, get near() { return nearRoom; }, get blackhole() { return bhOn; }, get fade() { return fade; }, idle(start, dur) { IDLE.start = start; IDLE.dur = dur; }, teleport(x, y, z, yaw) { player.set(x, y, z); if (yaw !== undefined) wYaw = yaw; touched(); dirty = true; }, canStand, surfaceAt, look(yaw, pitch) { wYaw = yaw; wPitch = pitch; dirty = true; } };
 
-// 라벨: 건물 밖 양옆 칸에 세우고, 방까지 인출선으로 잇는다 (도감처럼)
-const NS = 'http://www.w3.org/2000/svg';
-const leads = document.createElementNS(NS, 'svg');
-leads.setAttribute('class', 'leads');
-leads.setAttribute('aria-hidden', 'true');
-labelLayer.prepend(leads);
-const corners = Array.from({ length: 8 }, () => new THREE.Vector3());
-function houseRect(b) {
-  const box = new THREE.Box3();
-  for (const { obj, floor } of floorNodes) if (floorOn(floor)) box.expandByObject(obj);
-  if (box.isEmpty()) box.setFromObject(house);
-  let l = Infinity, r = -Infinity, t = Infinity, bot = -Infinity;
-  let i = 0;
-  for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
-    const p = corners[i++].set(x, y, z).project(camera);
-    const sx = (p.x * 0.5 + 0.5) * b.width, sy = (-p.y * 0.5 + 0.5) * b.height;
-    l = Math.min(l, sx); r = Math.max(r, sx); t = Math.min(t, sy); bot = Math.max(bot, sy);
-  }
-  return { l, r, t, bot };
-}
-// 한 줄에서 겹치지 않게: 앞에서부터 밀고, 끝을 넘으면 거꾸로 당긴다
-function spread(list, pos, size, lo, hi, gap) {
-  let min = lo;
-  for (const it of list) { it[pos] = Math.max(it[pos], min); min = it[pos] + it[size] + gap; }
-  let max = hi;
-  for (let k = list.length - 1; k >= 0; k--) { const it = list[k]; it[pos] = Math.min(it[pos], max - it[size]); max = it[pos] - gap; }
-  for (const it of list) it[pos] = Math.max(lo, it[pos]);
-}
+// 이름표(메뉴): 가까운 방 하나만, 그 자리 위에 뜬다
 function placeLabels() {
   const b = canvas.getBoundingClientRect();
-  if (walking) {                       // 1인칭: 가까운 방 하나만, 그 자리 위에 (인출선 없음)
-    leads.innerHTML = '';
-    ROOMS.forEach((r, i) => {
-      const el = labelEls[i];
-      if (r !== nearRoom) { el.hidden = true; el.classList.remove('near'); return; }
-      anchors[r.id].getWorldPosition(v).project(camera);
-      if (v.z > 1) { el.hidden = true; return; }
-      el.hidden = false; el.classList.add('near');
-      const sx = (v.x * 0.5 + 0.5) * b.width, sy = (-v.y * 0.5 + 0.5) * b.height;
-      const w = el.offsetWidth, h = el.offsetHeight;
-      const x = Math.min(b.width - w - 6, Math.max(6, sx - w / 2)), y = Math.min(b.height - h - 6, Math.max(6, sy - h - 18));
-      el.style.transform = `translate(${x.toFixed(0)}px, ${y.toFixed(0)}px)`;
-    });
-    return;
-  }
-  const hr = houseRect(b);
-  const GAP = 14, EDGE = 6, OUT = 16;
-  const shown = [];
   ROOMS.forEach((r, i) => {
-    const el = labelEls[i], a = anchors[r.id];
-    if (!a || !floorOn(r.floor)) { el.hidden = true; return; }
-    a.getWorldPosition(v);
-    el.classList.remove('near');
-    const side = v.clone().sub(center).setY(0).normalize().dot(camDir);
-    if (side < -0.8 && r.id !== 'dome') { el.hidden = true; return; }
-    v.project(camera);
+    const el = labelEls[i];
+    if (r !== nearRoom) { el.hidden = true; el.classList.remove('near'); return; }
+    anchors[r.id].getWorldPosition(v).project(camera);
     if (v.z > 1) { el.hidden = true; return; }
-    el.hidden = false;
-    shown.push({ el, ax: (v.x * 0.5 + 0.5) * b.width, ay: (-v.y * 0.5 + 0.5) * b.height });
+    el.hidden = false; el.classList.add('near');
+    const sx = (v.x * 0.5 + 0.5) * b.width, sy = (-v.y * 0.5 + 0.5) * b.height;
+    const w = el.offsetWidth, h = el.offsetHeight;
+    const x = Math.min(b.width - w - 6, Math.max(6, sx - w / 2)), y = Math.min(b.height - h - 6, Math.max(6, sy - h - 18));
+    el.style.transform = `translate(${x.toFixed(0)}px, ${y.toFixed(0)}px)`;
   });
-  let path = '', dots = '';
-  const put = (it, side) => {
-    for (const k of ['left', 'right', 'top', 'bottom']) it.el.classList.toggle(k, k === side);
-    it.el.style.transform = `translate(${it.x.toFixed(1)}px, ${it.y.toFixed(1)}px)`;
-    let lx, ly, bx, by;
-    if (side === 'left' || side === 'right') {
-      ly = by = it.y + it.h / 2;
-      lx = side === 'left' ? it.x + it.w + 3 : it.x - 3;
-      bx = side === 'left' ? lx + 10 : lx - 10;
-    } else {
-      lx = bx = it.x + it.w / 2;
-      ly = side === 'top' ? it.y + it.h + 3 : it.y - 3;
-      by = side === 'top' ? ly + 8 : ly - 8;
-    }
-    path += `M${lx.toFixed(1)} ${ly.toFixed(1)}L${bx.toFixed(1)} ${by.toFixed(1)}L${it.ax.toFixed(1)} ${it.ay.toFixed(1)}`;
-    dots += `<circle cx="${it.ax.toFixed(1)}" cy="${it.ay.toFixed(1)}" r="3.2"/>`;
-  };
-  const measure = (it, maxW) => { it.el.style.maxWidth = `${maxW.toFixed(0)}px`; it.w = it.el.offsetWidth; it.h = it.el.offsetHeight; };
-
-  if (!rowsMode) {
-    // 넓은 화면: 건물 양옆 칸. 방이 건물 어느 쪽에 있느냐로 나눈다
-    const mid = (hr.l + hr.r) / 2;
-    for (const key of ['left', 'right']) {
-      const list = shown.filter((it) => (it.ax < mid) === (key === 'left')).sort((p, q) => p.ay - q.ay);
-      const colW = Math.max(150, key === 'left' ? hr.l - GAP - EDGE : b.width - hr.r - GAP - EDGE);
-      for (const it of list) { measure(it, Math.min(colW, 220)); it.y = it.ay - it.h / 2; }
-      spread(list, 'y', 'h', EDGE, b.height - EDGE, 6);
-      // 무대 가장자리에 붙이고 긴 인출선으로 잇는다 (건물과 겹치면 건물 쪽 끝까지만)
-      for (const it of list) {
-        it.x = key === 'left' ? Math.min(OUT, hr.l - GAP - it.w) : Math.max(b.width - OUT - it.w, hr.r + GAP);
-        it.x = Math.max(EDGE, Math.min(b.width - EDGE - it.w, it.x));
-        put(it, key);
-      }
-    }
-  } else {
-    // 좁은 화면: 건물 위아래 띠. 많으면 두 줄로 엇갈려 선이 이름표 사이로 지나가게
-    const mid = (hr.t + hr.bot) / 2;
-    const maxW = (b.width - 2 * EDGE - 12) / 3;
-    for (const key of ['top', 'bottom']) {
-      const list = shown.filter((it) => (it.ay < mid) === (key === 'top')).sort((p, q) => p.ax - q.ax);
-      for (const it of list) measure(it, maxW);
-      const total = list.reduce((s, it) => s + it.w + 6, 0);
-      const rows = total > b.width - 2 * EDGE ? [list.filter((_, k) => k % 2 === 0), list.filter((_, k) => k % 2 === 1)] : [list];
-      // 띠는 무대 위아래 끝에서 시작해 건물 쪽으로 쌓는다. 먼 줄을 바깥에
-      const bandH = rows.reduce((s, row) => s + Math.max(0, ...row.map((it) => it.h)) + 6, 0);
-      let edge = key === 'top' ? Math.min(OUT + bandH, Math.max(EDGE + bandH, hr.t - GAP)) : Math.max(b.height - OUT - bandH, Math.min(b.height - EDGE - bandH, hr.bot + GAP));
-      for (const row of rows) {
-        const h = Math.max(0, ...row.map((it) => it.h));
-        for (const it of row) it.x = it.ax - it.w / 2;
-        spread(row, 'x', 'w', EDGE, b.width - EDGE, 6);
-        for (const it of row) {
-          it.y = key === 'top' ? Math.max(EDGE, edge - it.h) : Math.min(b.height - EDGE - it.h, edge);
-          put(it, key);
-        }
-        edge = key === 'top' ? edge - h - 6 : edge + h + 6;
-      }
-    }
-  }
-  leads.setAttribute('viewBox', `0 0 ${b.width.toFixed(0)} ${b.height.toFixed(0)}`);
-  leads.innerHTML = `<path d="${path}"/>${dots}`;
 }
 
-showFloors(0);
 frame();

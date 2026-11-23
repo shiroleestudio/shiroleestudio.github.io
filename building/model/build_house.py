@@ -863,7 +863,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import textures
 
 TEX_DIR = tempfile.mkdtemp(prefix='house_tex_')
-TEX = textures.make_all({k: COL[k] for k in textures.RECIPES if k in COL}, TEX_DIR)
+ASSET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'assets')   # 손그림·사진 텍스처가 있으면 생성 대신 쓴다 (building/assets/README.md)
+TEX = textures.make_all({k: COL[k] for k in textures.RECIPES if k in COL}, TEX_DIR, ASSET_DIR)
 
 IMG_CACHE = {}
 def _image(path, name, srgb=True):

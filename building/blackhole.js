@@ -99,8 +99,8 @@ void main(){ vec2 uv = gl_FragCoord.xy / res;
 
 export const BH = {
   CENTER: new THREE.Vector3(0, -1.45, 0),       // 세계 좌표. 지하실 한가운데, 바닥(−2.6) 위 1.15 m — 눈높이(1.45) 바로 아래라 살짝 내려다본다
-  SCALE: 0.1185,                                // m / 셰이더 단위. 원반 바깥 반지름 13.5 단위 = 1.6 m (두호: 지하실을 거의 꽉 채우게)
-  RADIUS: 16 * 0.1185,                          // 경계 공 반지름(m) 1.9. 셰이더의 BOUND 와 같다
+  SCALE: 0.148,                                 // m / 셰이더 단위. 원반 바깥 반지름 13.5 단위 = 2.0 m (두호: 지하실을 거의 꽉 채우게, 더 크게)
+  RADIUS: 16 * 0.148,                           // 경계 공 반지름(m) 2.37 — 벽(±2.2)을 조금 넘는다. 벽 뒤 부분은 깊이 검사로 가려진다
 };
 
 export function createBlackHole(renderer) {
@@ -109,7 +109,8 @@ export function createBlackHole(renderer) {
   const blurMat = mk(BLUR, { src: { value: null }, dir: { value: new THREE.Vector2() }, thr: { value: 0 } });
   const windowMat = new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: 'in vec3 position; uniform mat4 modelViewMatrix, projectionMatrix; void main(){ gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
     fragmentShader: SPHERE, uniforms: { base: { value: null }, glow: { value: null }, glow2: { value: null }, res: { value: new THREE.Vector2(1, 1) } },
-    transparent: true, depthWrite: false, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneMinusSrcAlphaFactor });
+    transparent: true, depthWrite: false, side: THREE.BackSide,   // 안쪽 면을 그린다 — 공이 방을 거의 채워 사람이 공 안에 서 있을 때가 많다 (앞면이면 안에서는 사라진다)
+    blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneMinusSrcAlphaFactor });
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), sceneMat);
   const qscene = new THREE.Scene(); qscene.add(quad);
   const qcam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);

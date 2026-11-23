@@ -8,12 +8,8 @@
 .bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;width:min(900px,100% - 32px);margin:0 auto;padding:6px 0}
 .stage.nowebgl ~ .bar,.stage.failed ~ .bar{display:none}
 .home-page header .wrap{padding:12px 0}
-.bar .floors,.bar .hint{margin:0}
+.bar .hint{margin:0}
 .zoom{display:flex;gap:6px}
-.bar .walk{font:inherit;font-size:13px;letter-spacing:.04em;background:transparent;color:var(--ink-2);border:1px solid var(--rule);border-radius:2px;padding:5px 12px;cursor:pointer;margin-right:auto}
-.bar .walk[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
-.bar .walk:focus-visible{outline:2px solid var(--mustard);outline-offset:2px}
-.bar button:disabled{opacity:.4;cursor:default}
 /* 1인칭 걷기: 가상 조이스틱 — 왼쪽 반을 누른 자리(left/top 은 코드가 넣음)에 뜨고, 손가락을 떼면 사라진다 */
 .joy{position:absolute;width:104px;height:104px;margin:-52px 0 0 -52px;border:1px solid var(--rule);border-radius:50%;background:color-mix(in srgb,var(--paper) 55%,transparent);pointer-events:none}
 .joy[hidden]{display:none}
@@ -45,15 +41,10 @@ footer.slim a{color:var(--ink-2)}
 .stage:active{cursor:grabbing}
 .stage canvas{display:block;position:absolute;inset:0;width:100%;height:100%}   /* 절대 배치: 캔버스 크기가 레이아웃에 끼지 않게 */
 .labels{position:absolute;inset:0;pointer-events:none}
-.leads{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
-.leads path{fill:none;stroke:var(--ink);stroke-width:1;opacity:.75}
-.leads circle{fill:var(--ink);stroke:var(--paper);stroke-width:1.5}
 .callout{position:absolute;left:0;top:0;pointer-events:auto;display:block;text-decoration:none;color:var(--ink);line-height:1.3;
   transform:translate(-9999px,-9999px);background:var(--paper);border:1px solid var(--rule);padding:4px 8px;border-radius:2px}
 .callout .pin{display:none}
 .callout .txt{display:block}
-.callout.left{text-align:right}
-.callout.top,.callout.bottom{text-align:center}
 .callout b{display:block;font-family:"Apple Myungjo","Noto Serif KR","Nanum Myeongjo",Georgia,serif;font-weight:600;font-size:14px}
 .callout small{display:block;font-size:12px;color:var(--ink-2)}
 .callout:hover,.callout:focus-visible{border-color:var(--ink)}
