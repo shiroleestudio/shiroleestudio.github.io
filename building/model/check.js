@@ -18,10 +18,12 @@ const srv = http.createServer((q, r) => {
 const SPOTS = [
   ['마당', 0.8, 0, 6.6, 0], ['현관 앞', 0.8, 0, 3.0, 0], ['찻집', 0.0, 0.08, 0.5, 0.6],
   ['계단 중간', -2.4, 1.5, -0.85, 0], ['2층', -1.0, 2.9, -1.5, 2.2], ['루프탑', -1.5, 5.6, 0.5, 2.6],
-  ['돌계단', -3.45, -1.3, -0.3, 0], ['지하실', 1.8, -2.6, 0.3, -2.0], ['블랙홀멍', 0.0, -2.6, 2.0, 0],
+  ['돌계단', -3.45, -1.3, -0.3, 0], ['지하실', 1.8, -2.6, 0.3, -2.0], ['블랙홀멍', 1.2, -2.6, 1.6, 0.5],
 ];
 // 막혀야 하는 자리 [이름, x, y, z]
-const WALLS = [['1층 벽', 2.95, 0.08, 0.0], ['지하 벽', 2.9, -2.6, 0.0], ['지하 긴 의자', 0.0, -2.6, 1.6], ['블랙홀', 0.0, -2.6, 0.0], ['2층 칸막이', 0.3, 2.9, -1.0], ['데크 밖', -0.3, 5.6, 0.0], ['2층 구멍', -2.4, 2.9, -1.0], ['울타리', 8.5, 0, 0]];
+const WALLS = [['1층 벽', 2.95, 0.08, 0.0], ['지하 벽', 2.9, -2.6, 0.0], ['지하 긴 의자', 0.0, -2.6, 1.95], ['블랙홀', 0.0, -2.6, 0.0], ['2층 칸막이', 0.3, 2.9, -1.0], ['데크 밖', -0.3, 5.6, 0.0], ['2층 구멍', -2.4, 2.9, -1.0], ['울타리', 8.5, 0, 0]];
+// 캡처: locator.screenshot 은 요소가 '안정'될 때까지 기다리는데 무거운 화면에서는 시간이 넘친다 → 무대 영역을 잘라 바로 찍는다
+const shot = async (page, file) => { const r = await page.evaluate(() => { const b = document.getElementById('stage').getBoundingClientRect(); return { x: b.x, y: b.y, width: b.width, height: b.height }; }); return page.screenshot({ path: file, clip: r, animations: 'disabled', timeout: 60000 }); };
 const SIZES = [['pc-wide', 1536, 700], ['pc-tall', 1280, 900], ['phone', 390, 844], ['phone-land', 844, 390]];
 srv.listen(0, async () => {
   const port = srv.address().port;
@@ -45,31 +47,31 @@ srv.listen(0, async () => {
     if (!st.walking) bad('걷기가 기본이 아님');
     if (st.barBottom > st.inner + 1) bad(`하단 버튼 줄이 화면 밖 (${st.barBottom.toFixed(0)} > ${st.inner})`);
     if (st.btn !== '둘러보기') bad(`단추 글자 ${st.btn}`);
-    await page.locator('#stage').screenshot({ path: path.join(outDir, `${name}-start.png`) });
+    await shot(page, path.join(outDir, `${name}-start.png`));
     if (name === 'pc-wide') {
       for (const [label, x, y, z, yaw] of SPOTS) {
         const ok = await page.evaluate(([x, y, z]) => { const H = window.__house; H.teleport(x, y, z); return { stand: H.canStand(x, z), h: H.surfaceAt(x, z, y) }; }, [x, y, z]);
         if (!ok.stand || Math.abs(ok.h - y) > 0.3) bad(`${label} 에 설 수 없음 (canStand ${ok.stand}, 바닥 ${ok.h})`);
         await page.evaluate(([x, y, z, yaw]) => { window.__house.teleport(x, y, z, yaw); window.__house.look(yaw, 0.02); }, [x, y, z, yaw]);
         await page.waitForTimeout(400);
-        await page.locator('#stage').screenshot({ path: path.join(outDir, `spot-${SPOTS.indexOf(SPOTS.find((s) => s[0] === label)) + 1}-${label}.png`) });
+        await shot(page, path.join(outDir, `spot-${SPOTS.indexOf(SPOTS.find((s) => s[0] === label)) + 1}-${label}.png`));
         // 블랙홀은 창을 볼 때만 그려야 한다 (지하실 자리는 남쪽 벽을 보고, 블랙홀멍 자리는 북쪽 창을 본다)
         const bhOn = await page.evaluate(() => window.__house.blackhole);
         if (label === '블랙홀멍' && !bhOn) bad('블랙홀을 보는데 그려지지 않음');
         if (label !== '블랙홀멍' && label !== '지하실' && bhOn) bad(`${label} 에서 블랙홀이 그려짐`);
       }
       // 블랙홀은 늘 움직인다: 두 시점의 캡처가 달라야 한다
-      await page.evaluate(() => { window.__house.teleport(0, -2.6, 2.0, 0); window.__house.look(0, -0.15); });
+      await page.evaluate(() => { window.__house.teleport(1.2, -2.6, 1.6, 0.5); window.__house.look(0.5, -0.15); });
       await page.waitForTimeout(400);
-      const f1 = await page.locator('#stage').screenshot(); await page.waitForTimeout(700);
-      const f2 = await page.locator('#stage').screenshot({ path: path.join(outDir, 'blackhole-2.png') });
+      const f1 = await shot(page, path.join(outDir, 'blackhole-1.png')); await page.waitForTimeout(700);
+      const f2 = await shot(page, path.join(outDir, 'blackhole-2.png'));
       if (f1.equals(f2)) bad('블랙홀이 움직이지 않음');
       // 멍: 조작이 없으면 배경이 사라진다 (검사에서는 0.3초 뒤부터 1초에 걸쳐)
-      await page.evaluate(() => { window.__house.idle(0.3, 1.0); window.__house.teleport(0, -2.6, 2.0, 0); });
+      await page.evaluate(() => { window.__house.idle(0.3, 1.0); window.__house.teleport(1.2, -2.6, 1.6, 0.5); });
       await page.waitForTimeout(1800);
       const fd = await page.evaluate(() => window.__house.fade);
       if (fd < 0.99) bad(`멍 때려도 배경이 안 사라짐 (fade ${fd})`);
-      await page.locator('#stage').screenshot({ path: path.join(outDir, 'blackhole-idle.png') });
+      await shot(page, path.join(outDir, 'blackhole-idle.png'));
       await page.evaluate(() => window.__house.idle(6, 14));
       await page.keyboard.down('KeyA'); await page.waitForTimeout(100); await page.keyboard.up('KeyA'); await page.waitForTimeout(1200);
       const fd2 = await page.evaluate(() => window.__house.fade);
@@ -86,11 +88,11 @@ srv.listen(0, async () => {
       const doorOk = await page.evaluate(() => { const H = window.__house; H.teleport(0.8, 0.0, 2.8); return [2.6, 2.45, 2.3, 2.0].every((z) => H.canStand(0.8, z)); });   // 문턱(벽 두께 구간 2.37~2.56)도 지나야 한다
       if (!doorOk) bad('현관 문턱을 지날 수 없음');
       // 둘러보기 전환·복귀
-      await page.click('[data-walk]'); await page.waitForTimeout(300);
+      await page.evaluate(() => document.querySelector('[data-walk]').click()); await page.waitForTimeout(300);   // page.click 은 화면이 '안정'되길 기다리다 무거운 화면에서 시간이 넘친다
       const orbit = await page.evaluate(() => !window.__house.walking && document.querySelector('[data-walk]').textContent);
       if (orbit !== '걷기') bad('둘러보기 전환 실패');
-      await page.locator('#stage').screenshot({ path: path.join(outDir, `orbit.png`) });
-      await page.click('[data-walk]'); await page.waitForTimeout(300);
+      await shot(page, path.join(outDir, 'orbit.png'));
+      await page.evaluate(() => document.querySelector('[data-walk]').click()); await page.waitForTimeout(300);   // page.click 은 화면이 '안정'되길 기다리다 무거운 화면에서 시간이 넘친다
     }
     if (logs.length) { for (const l of logs) bad(l); }
     await ctx.close();

@@ -1,7 +1,8 @@
 // 시로의 집 — 3D 건물 (2026-10-26)
 // 허브 첫 화면(/)의 주인공. 1층 찻집 · 2층 갤러리(화실+공방) · 3층 다락(놀이방·천문대) + 루프탑. 지붕 위 돔에서 망원경이 나온다.
 // 모델: house.glb (model/build_house.py 로 Blender 에서 만든다. 콘셉트 그림은 두호의 나노바나나 초안).
-// 그림체: 툰 4단 명암 + 구운 구석 그늘(모델 정점색) + 해 그림자 + 화면 공간 잉크 외곽선 + 종이 결. 색은 모델 재질 색, 배경은 site.css 토큰.
+// 그림체(3단계 그래픽 일신, 두호 2026-11-23: '8번 출구'급 실사 + 몽환적 판타지 동화풍): PBR 실사 재질(색·법선·거칠기 지도, 모델에 든 것) + 구운 구석 그늘(정점색)
+// + 해 그림자맵 + 하늘 환경광(PMREM) + 후처리(블룸·거리 안개·ACES 톤·색 보정·비네트·필름 그레인·약한 색수차). 배경은 셰이더 하늘(낮: 구름, 밤: 별·달).
 // 손가락을 따라 상하·좌우로 돈다. 카메라를 향한 벽·지붕은 걷어 낸다(단면). 방 이름표는 건물 밖 양옆에 세우고 인출선으로 잇는다(HTML 링크).
 // 기본은 1인칭 걷기(두호 2026-11-23: 게임처럼 이용하는 사이트): 마당에서 시작해 현관으로 들어가고, 서쪽 벽 계단으로 2층·루프탑, 바깥 돌계단으로 지하실에 간다 (아래 '1인칭 걷기').
 // 지하실 한가운데에는 캠프파이어처럼 블랙홀이 떠서 돈다(blackhole.js, '블랙홀멍'). 보일 때만 저해상도 버퍼에 그리고, 방은 그 주황빛으로 물든다.
@@ -10,7 +11,7 @@
 // 캐릭터는 아직 없다. TODO(character-sheet).
 import * as THREE from 'three';
 import { GLTFLoader } from '../assets/vendor/three/addons/loaders/GLTFLoader.js';
-import { createBlackHole, BH } from './blackhole.js?v=0.10.0';   // 지하실 한가운데의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
+import { createBlackHole, BH } from './blackhole.js?v=0.11.0';   // 지하실 한가운데의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
 
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('scene');
@@ -47,9 +48,10 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(28, 1, 0.5, 200);
 
-const hemi = new THREE.HemisphereLight(0xfff6e4, 0x9c8a72, 1.4);
-const sun = new THREE.DirectionalLight(0xfff0d8, 1.6);
+const hemi = new THREE.HemisphereLight(0xfff6e4, 0x9c8a72, 0.55);
+const sun = new THREE.DirectionalLight(0xfff0d8, 3.0);
 sun.position.set(-6, 14, 9);
+const SUN_DIR = sun.position.clone().normalize();
 // 해 그림자: 집 전체(반지름 약 7m)를 덮는 직교 카메라 하나. 걷어 낸 벽은 그림자도 안 드리운다.
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
@@ -73,55 +75,110 @@ const IDLE = { start: 6, dur: 14 };
 const touched = () => { lastInput = performance.now(); if (fade > 0) dirty = true; };
 const frustum = new THREE.Frustum(), projView = new THREE.Matrix4();
 
-// 4단 톤 — 수채 그림처럼 명암을 끊는다 (구석 그늘은 모델 정점색이, 해 그림자는 그림자맵이 더한다)
-const tone = new THREE.DataTexture(new Uint8Array([138, 138, 138, 255, 178, 178, 178, 255, 218, 218, 218, 255, 255, 255, 255, 255]), 4, 1);
-tone.minFilter = tone.magFilter = THREE.NearestFilter;
-tone.needsUpdate = true;
+// 하늘 환경광: 작은 하늘 공을 PMREM 으로 구워 scene.environment 에 — PBR 재질의 반사·간접광. 테마가 바뀌면 다시 굽는다
+const pmrem = new THREE.PMREMGenerator(renderer);
+const skyEnvMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false,
+  uniforms: { zen: { value: new THREE.Color() }, hor: { value: new THREE.Color() }, gnd: { value: new THREE.Color() }, sunDir: { value: SUN_DIR }, sunCol: { value: new THREE.Color() } },
+  vertexShader: 'varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
+  fragmentShader: `uniform vec3 zen, hor, gnd, sunDir, sunCol; varying vec3 vDir;
+    void main(){ float y = vDir.y; vec3 c = y > 0. ? mix(hor, zen, pow(y, 0.6)) : mix(hor, gnd, min(1., -y * 3.));
+      c += sunCol * pow(max(dot(vDir, sunDir), 0.), 48.) * 2.0; gl_FragColor = vec4(c, 1.); }`,
+});
+const skyEnvScene = new THREE.Scene(); skyEnvScene.add(new THREE.Mesh(new THREE.SphereGeometry(10, 24, 12), skyEnvMat));
+let envTex = null;
+function bakeEnvironment() {
+  if (envTex) envTex.dispose();
+  envTex = pmrem.fromScene(skyEnvScene, 0.02).texture;
+  scene.environment = envTex;
+}
 
-// ---- 외곽선 + 종이 결 (화면 공간 후처리) ----
+// ---- 후처리 (화면 공간) ----
+// 1) 장면을 HDR(HalfFloat, 4x MSAA) 로 그린다 → 2) 밝은 곳만 뽑아 1/4·1/8 로 흐린다(블룸) → 3) 합성: 하늘 배경, 거리 안개, 블룸, ACES 톤, 색 보정, 비네트, 그레인, 색수차, 멍(fade)
 const rtColor = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });   // 4x MSAA (WebGL2)
 rtColor.depthTexture = new THREE.DepthTexture(1, 1);
-const rtNormal = new THREE.WebGLRenderTarget(1, 1);
-const normalMat = new THREE.MeshNormalMaterial();
+const mkRT = (w, h) => new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, depthBuffer: false });
+const bloomRT = { a: mkRT(1, 1), b: mkRT(1, 1), c: mkRT(1, 1), d: mkRT(1, 1) };
+const blurMat = new THREE.ShaderMaterial({
+  uniforms: { src: { value: null }, dir: { value: new THREE.Vector2() }, thr: { value: 0 }, texel: { value: new THREE.Vector2() } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }',
+  fragmentShader: `uniform sampler2D src; uniform vec2 dir, texel; uniform float thr; varying vec2 vUv;
+    void main(){ float w[7]; w[0]=0.2; w[1]=0.17; w[2]=0.12; w[3]=0.07; w[4]=0.035; w[5]=0.015; w[6]=0.005;
+      vec3 s = vec3(0.);
+      for (int i = -6; i <= 6; i++) { vec3 c = texture2D(src, vUv + dir * texel * float(i) * 1.5).rgb; c = max(c - thr, 0.); s += c * w[i < 0 ? -i : i]; }
+      gl_FragColor = vec4(s, 1.); }`,
+  depthTest: false, depthWrite: false,
+});
 const post = new THREE.ShaderMaterial({
   uniforms: {
-    tColor: { value: rtColor.texture }, tDepth: { value: rtColor.depthTexture }, tNormal: { value: rtNormal.texture },
-    texel: { value: new THREE.Vector2() }, near: { value: camera.near }, far: { value: camera.far },
-    ink: { value: new THREE.Color() }, paper: { value: new THREE.Color() }, line: { value: 1.0 },
+    tColor: { value: rtColor.texture }, tDepth: { value: rtColor.depthTexture }, tBloom: { value: bloomRT.b.texture }, tBloom2: { value: bloomRT.d.texture },
+    texel: { value: new THREE.Vector2() }, near: { value: camera.near }, far: { value: camera.far }, time: { value: 0 },
+    zen: { value: new THREE.Color() }, hor: { value: new THREE.Color() }, fogCol: { value: new THREE.Color() }, sunCol: { value: new THREE.Color() },
+    night: { value: 0.0 }, fogDensity: { value: 0.011 }, exposure: { value: 1.0 }, cloud: { value: 1.0 },
+    camMat: { value: new THREE.Matrix3() }, tanV: { value: 0.5 }, aspect: { value: 1 }, sunDir: { value: SUN_DIR },
     tCover: { value: null }, fade: { value: 0.0 },   // 블랙홀멍: 블랙홀이 덮는 정도(화면 버퍼 알파)와 배경을 지우는 정도
-    sky: { value: new THREE.Color() }, night: { value: 0.0 },   // 배경 하늘: 위는 sky, 지평선 쪽은 paper. 밤이면 별
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }',
   fragmentShader: `
-    uniform sampler2D tColor, tDepth, tNormal, tCover; uniform vec2 texel; uniform float near, far, line, night, fade;
-    uniform vec3 ink, paper, sky; varying vec2 vUv;
+    uniform sampler2D tColor, tDepth, tBloom, tBloom2, tCover; uniform vec2 texel; uniform float near, far, night, fogDensity, exposure, fade, time, tanV, aspect, cloud;
+    uniform vec3 zen, hor, fogCol, sunCol, sunDir; uniform mat3 camMat; varying vec2 vUv;
     float lin(float z){ return (2.0*near*far)/(far+near-(z*2.0-1.0)*(far-near)); }
     float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }
-    vec3 toSRGB(vec3 c){ return pow(max(c, 0.0), vec3(1.0/2.2)); }
-    void main(){
-      vec2 o = texel * line;
-      float d0 = texture2D(tDepth, vUv).r;
-      float dc = lin(d0);
-      vec3 nc = texture2D(tNormal, vUv).rgb;
-      float ed = 0.0, en = 0.0;
-      vec2 offs[4]; offs[0]=vec2(o.x,0.); offs[1]=vec2(-o.x,0.); offs[2]=vec2(0.,o.y); offs[3]=vec2(0.,-o.y);
-      for (int i=0;i<4;i++){
-        float d = lin(texture2D(tDepth, vUv+offs[i]).r);
-        ed += abs(d - dc) / max(min(d, dc), 0.001);
-        vec3 n = texture2D(tNormal, vUv+offs[i]).rgb;
-        en += length(n - nc);
+    float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.-2.*f);
+      return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y); }
+    vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14), 0., 1.); }
+    // 하늘: 지평선→천정 그라데이션, 해 무리, 느리게 흐르는 구름(낮), 별·달(밤)
+    vec3 sky(vec3 d){
+      float y = max(d.y, 0.0);
+      vec3 c = mix(hor, zen, pow(y, 0.42));
+      float sd = max(dot(d, sunDir), 0.0);
+      c += sunCol * (pow(sd, 32.0) * 0.6 + pow(sd, 600.0) * 6.0);
+      if (d.y > 0.01 && cloud > 0.0) {                                       // 구름: 하늘 평면에 투영한 fbm 세 층
+        vec2 uv = d.xz / (d.y + 0.15) * 0.9 + vec2(time * 0.004, time * 0.0015);
+        float n = vnoise(uv) * 0.55 + vnoise(uv * 2.1 + 3.0) * 0.3 + vnoise(uv * 4.3 + 7.0) * 0.15;
+        float cl = smoothstep(0.52, 0.78, n) * smoothstep(0.0, 0.25, d.y) * cloud;
+        vec3 cc = mix(hor * 1.15, vec3(1.0, 0.98, 0.95), 0.5) * (1.0 - night * 0.8);
+        c = mix(c, cc, cl * 0.85);
       }
-      float edge = clamp(smoothstep(0.06, 0.14, ed) + smoothstep(0.35, 0.7, en), 0.0, 1.0);
+      if (night > 0.0) {
+        vec2 g = floor((d.xz / (d.y + 0.2)) * 160.0);
+        float st = step(0.985, hash(g + 3.0)) * (0.4 + 0.6 * hash(g + 9.0)) * smoothstep(0.05, 0.4, d.y);
+        c += night * st * vec3(0.9, 0.9, 1.0) * 0.8;
+        vec3 moon = normalize(vec3(0.55, 0.5, -0.6));
+        float md = dot(d, moon);
+        c += night * (smoothstep(0.9985, 0.9992, md) * vec3(1.0, 0.97, 0.9) * 2.0 + pow(max(md, 0.0), 80.0) * vec3(0.25, 0.3, 0.45));
+      }
+      return c;
+    }
+    void main(){
+      vec2 q = (vUv - 0.5) * 2.0;
+      // 약한 색수차: 가장자리에서 R·B 를 바깥쪽으로 조금
+      vec2 ca = q * dot(q, q) * 0.0012;
       vec4 c = texture2D(tColor, vUv);
-      // 하늘: 수채처럼 위에서 아래로 번지는 두 색. 밤에는 드문드문 별 (화소마다 고정이라 깜빡이지 않는다)
-      vec3 bg = mix(paper, sky, smoothstep(0.15, 0.95, vUv.y));
-      float star = step(0.9975, hash(floor(gl_FragCoord.xy / 1.5) + 3.0)) * smoothstep(0.3, 0.7, vUv.y);
-      bg += star * night * (0.5 + 0.5 * hash(floor(gl_FragCoord.xy / 1.5) + 9.0)) * vec3(0.9, 0.85, 0.7);
-      vec3 col = mix(bg, toSRGB(c.rgb), c.a);
-      col = mix(col, ink, edge * 0.85);
-      float g = hash(floor(gl_FragCoord.xy)) * 0.035 - 0.0175;          // 종이 결
-      float g2 = hash(floor(gl_FragCoord.xy / 3.0) + 7.0) * 0.025 - 0.0125;
-      col *= 1.0 + g + g2;
+      c.r = texture2D(tColor, vUv - ca).r; c.b = texture2D(tColor, vUv + ca).b;
+      vec3 col = c.rgb;
+      // 하늘 배경(장면이 없는 화소) + 거리 안개
+      vec3 dir = normalize(camMat * vec3(q.x * tanV * aspect, q.y * tanV, -1.0));
+      vec3 bg = sky(dir);
+      float dz = lin(texture2D(tDepth, vUv).r);
+      float fog = 1.0 - exp(-dz * fogDensity);
+      vec3 fc = mix(fogCol, bg, 0.5);
+      col = mix(col, fc, fog * 0.9);
+      col = mix(bg, col, c.a);
+      // 블룸 (밝은 창·블랙홀·해 무리가 번진다)
+      col += texture2D(tBloom, vUv).rgb * 0.3 + texture2D(tBloom2, vUv).rgb * 0.2;
+      // 톤: 노출 → ACES → 색 보정(그늘은 살짝 보라·파랑, 밝은 곳은 따뜻하게 — 몽환) → 채도
+      col = aces(col * exposure);
+      float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
+      col += vec3(0.018, 0.01, 0.038) * (1.0 - lum) * smoothstep(0.0, 0.06, lum);   // 순검정(블랙홀 지평선)은 그대로 둔다
+      col = mix(col, col * vec3(1.03, 1.0, 0.96), lum);
+      col = mix(vec3(lum), col, 1.12);
+      col = mix(col, col * col * (3.0 - 2.0 * col), 0.3);                   // 살짝 S 자 대비
+      col = pow(max(col, 0.0), vec3(1.0 / 2.2));
+      // 비네트 + 필름 그레인(화소마다 고정 — 깜빡이지 않는다)
+      col *= 1.0 - 0.2 * dot(q, q) * 0.7;
+      float g = hash(floor(gl_FragCoord.xy)) - 0.5;
+      col += g * 0.022;
       if (fade > 0.0) {                                                     // 멍: 블랙홀이 아닌 곳은 어둠으로, 어둠 속에 별이 조금
         float cov = texture2D(tCover, vUv).a;
         float st = step(0.9985, hash(floor(gl_FragCoord.xy / 1.5) + 11.0)) * (0.3 + 0.7 * hash(floor(gl_FragCoord.xy / 1.5) + 5.0));
@@ -132,18 +189,45 @@ const post = new THREE.ShaderMaterial({
   depthTest: false, depthWrite: false,
 });
 const postScene = new THREE.Scene();
-postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), post));
+const postQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), post);
+postScene.add(postQuad);
 const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+function blurPass(src, dst, dx, dy, thr) {
+  postQuad.material = blurMat;
+  blurMat.uniforms.src.value = src.texture; blurMat.uniforms.dir.value.set(dx, dy); blurMat.uniforms.thr.value = thr;
+  blurMat.uniforms.texel.value.set(1 / src.width, 1 / src.height);
+  renderer.setRenderTarget(dst); renderer.render(postScene, postCam);
+}
+function composite() {
+  blurPass(rtColor, bloomRT.a, 1, 0, 1.5); blurPass(bloomRT.a, bloomRT.b, 0, 1, 0);
+  blurPass(bloomRT.b, bloomRT.c, 1, 0, 0); blurPass(bloomRT.c, bloomRT.d, 0, 1, 0);
+  postQuad.material = post;
+  post.uniforms.camMat.value.setFromMatrix4(camera.matrixWorld);
+  post.uniforms.tanV.value = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2); post.uniforms.aspect.value = camera.aspect;
+  renderer.setRenderTarget(null); renderer.render(postScene, postCam);
+}
 
 function applyTheme() {
   const dark = document.documentElement.dataset.theme === 'dark' || (darkQuery.matches && document.documentElement.dataset.theme !== 'light');
-  post.uniforms.paper.value.setStyle(css('--paper-2', '#d8d0bb'), THREE.NoColorSpace);
-  post.uniforms.sky.value.setStyle(dark ? '#161c2a' : '#c9d1c6', THREE.NoColorSpace);   // 낮: 옅은 세이지 하늘 · 밤: 먹빛 남색
-  post.uniforms.night.value = dark ? 1 : 0;
-  post.uniforms.ink.value.setStyle(dark ? '#1a140f' : '#3a2c22', THREE.NoColorSpace);
-  hemiBase = dark ? 0.85 : 1.4; hemi.intensity = hemiBase;
-  sun.intensity = dark ? 0.7 : 1.6;
-  hemi.color.set(dark ? 0x9fb0d0 : 0xfff6e4);
+  const u = post.uniforms, e = skyEnvMat.uniforms;
+  // 낮: 연한 라벤더-파랑 하늘, 크림빛 지평선, 따뜻한 해. 밤: 먹빛 남색, 별·달, 차가운 달빛 — 창은 노랗게 빛난다
+  u.zen.value.setStyle(dark ? '#0d1226' : '#7f9bd0', THREE.SRGBColorSpace);
+  u.hor.value.setStyle(dark ? '#262c48' : '#eadfcb', THREE.SRGBColorSpace);
+  u.fogCol.value.setStyle(dark ? '#1a2038' : '#d9d2c8', THREE.SRGBColorSpace);
+  u.sunCol.value.setStyle(dark ? '#334066' : '#ffe2b0', THREE.SRGBColorSpace);
+  u.night.value = dark ? 1 : 0;
+  fogBase = dark ? 0.010 : 0.006; u.fogDensity.value = fogBase;
+  u.exposure.value = dark ? 1.1 : 1.0;
+  u.cloud.value = dark ? 0.35 : 1.0;
+  e.zen.value.copy(u.zen.value); e.hor.value.copy(u.hor.value); e.sunCol.value.copy(u.sunCol.value);
+  e.gnd.value.setStyle(dark ? '#141412' : '#6f6a55', THREE.SRGBColorSpace);
+  hemiBase = dark ? 0.18 : 0.55; hemi.intensity = hemiBase;
+  sun.intensity = dark ? 0.35 : 3.0;
+  sun.color.set(dark ? 0x9fb3e6 : 0xfff0d8);
+  hemi.color.set(dark ? 0x7f90b8 : 0xfff6e4);
+  glowBoost = dark ? 3.2 : 1.6;
+  for (const m of glowMats) m.color.copy(m.userData.base).multiplyScalar(glowBoost);
+  bakeEnvironment();
   dirty = true;
 }
 
@@ -159,16 +243,29 @@ const center = new THREE.Vector3(0, 4.2, 0);
 let radius = 26, fitR = 6, rowsMode = false;
 let house = null, door = null;   // door: 현관 문짝 (원점이 경첩, 걷기 모드에서 연다)
 let dirty = true;
-let hemiBase = 1.4;          // 테마가 정한 하늘빛 세기 (지하실에서는 0.3 배로 어둡게)
+let hemiBase = 0.55;         // 테마가 정한 하늘빛 세기 (지하실에서는 0.25 배로 어둡게)
+let fogBase = 0.011;          // 테마가 정한 안개 농도 (지하실에서는 0)
+let glowBoost = 1.6;          // 불 켜진 창·전구의 밝기 배율(HDR — 블룸이 번진다). 밤에 더 밝다
+const glowMats = [];
 
-const toonCache = new Map();
-function toonize(m, vc) {
-  if (m.name.startsWith('glow')) return new THREE.MeshBasicMaterial({ color: m.color });
+const matCache = new Map();
+function materialize(m, vc) {
+  // 모델의 PBR 재질(MeshStandardMaterial: 색·법선·거칠기 지도)을 그대로 쓰되, 구워 둔 구석 그늘(COLOR_0)을 곱하고 결이 뭉개지지 않게 한다
   const key = m.name + (vc ? '+vc' : '');
-  // map: 모델에 든 생성 텍스처(나뭇결·지붕널·회벽…). vertexColors: 구워 둔 구석 그늘(COLOR_0)을 곱한다 (없는 메시는 재질 색만)
-  if (m.map) m.map.anisotropy = renderer.capabilities.getMaxAnisotropy();   // 비스듬한 바닥·지붕에서도 결이 뭉개지지 않게
-  if (!toonCache.has(key)) toonCache.set(key, new THREE.MeshToonMaterial({ color: m.color, map: m.map || null, gradientMap: tone, vertexColors: vc }));
-  return toonCache.get(key);
+  if (matCache.has(key)) return matCache.get(key);
+  let out;
+  if (m.name.startsWith('glow')) {                  // 불 켜진 창·전구: 조명 없이 밝게 (HDR → 블룸)
+    out = new THREE.MeshBasicMaterial({ color: m.color.clone().multiplyScalar(glowBoost) });
+    out.userData.base = m.color.clone(); glowMats.push(out);
+  } else {
+    out = m.clone();
+    out.vertexColors = vc;
+    out.envMapIntensity = 0.6;
+    for (const t of [out.map, out.normalMap, out.roughnessMap, out.metalnessMap]) if (t) t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    if (out.normalMap) out.normalScale.set(0.9, 0.9);
+  }
+  matCache.set(key, out);
+  return out;
 }
 
 const loading = document.createElement('p');
@@ -182,7 +279,7 @@ new GLTFLoader().load(new URL('house.glb', import.meta.url).href, (gltf) => {
     if (o.isMesh) {
       if (!o.geometry.getAttribute('normal')) o.geometry.computeVertexNormals();   // glb 에 법선을 안 넣는다 (면이 평평해 계산값이 같다)
       const vc = !!o.geometry.getAttribute('color');
-      o.material = Array.isArray(o.material) ? o.material.map((m) => toonize(m, vc)) : toonize(o.material, vc);
+      o.material = Array.isArray(o.material) ? o.material.map((m) => materialize(m, vc)) : materialize(o.material, vc);
       o.castShadow = o.receiveShadow = true;
       pickables.push(o);
     }
@@ -376,10 +473,11 @@ function resize() {
   if (!w || !h) return;
   renderer.setSize(w, h, false);
   const pr = renderer.getPixelRatio();
-  rtColor.setSize(w * pr, h * pr); rtNormal.setSize(w * pr, h * pr);
+  rtColor.setSize(w * pr, h * pr);
+  bloomRT.a.setSize((w * pr) >> 2, (h * pr) >> 2); bloomRT.b.setSize((w * pr) >> 2, (h * pr) >> 2);
+  bloomRT.c.setSize((w * pr) >> 3, (h * pr) >> 3); bloomRT.d.setSize((w * pr) >> 3, (h * pr) >> 3);
   bh.setSize(w * pr, h * pr, Math.min(0.5, 720 / (w * pr)));                      // 블랙홀 버퍼: 화면의 1/2, 폭 720 화소 상한
   post.uniforms.texel.value.set(1 / (w * pr), 1 / (h * pr));
-  post.uniforms.line.value = Math.max(1, pr * 0.9);
   camera.aspect = w / h;
   camera.fov = walking ? (camera.aspect < 1 ? 85 : 62) : 28;
   const vf = THREE.MathUtils.degToRad(camera.fov) / 2;
@@ -444,19 +542,18 @@ function frame() {
     bhOn = inCellar && frustum.setFromProjectionMatrix(projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)).intersectsObject(bhSphere);
     bhLight.visible = inCellar; sun.visible = !inCellar;                       // 지하는 해가 안 든다. 하늘빛도 줄여 블랙홀이 돋보이게
     hemi.intensity = inCellar ? hemiBase * 0.25 : hemiBase;
-    if (inCellar) bhLight.intensity = 6 + 1.5 * Math.sin(now * 0.0021) + 0.8 * Math.sin(now * 0.0057 + 1.0) + 0.4 * Math.sin(now * 0.013);   // 모닥불처럼
+    if (inCellar) bhLight.intensity = 14 + 3.0 * Math.sin(now * 0.0021) + 1.5 * Math.sin(now * 0.0057 + 1.0) + 0.8 * Math.sin(now * 0.013);   // 모닥불처럼
     if (bhOn) bh.render(camera, now / 1000);
     // 멍: 지하실에서 조작이 없으면 방이 사라진다 (블랙홀 공이 안 보이면 지우지 않는다 — 깜깜해지기만 하니까)
     const idle = (now - lastInput) / 1000;
     fade = bhOn ? Math.min(1, Math.max(0, (idle - IDLE.start) / IDLE.dur)) : 0;
     post.uniforms.fade.value = fade; post.uniforms.tCover.value = bh.coverage();
 
-    // 1) 색 2) 법선 3) 외곽선·종이 결
+    // 1) 장면(HDR) 2) 블룸 3) 합성
+    post.uniforms.time.value = reduceMotion.matches ? 0 : now / 1000;
+    post.uniforms.fogDensity.value = inCellar ? 0 : walking ? fogBase : fogBase * 0.35;   // 둘러보기는 멀리서 보니 안개를 줄인다
     renderer.setRenderTarget(rtColor); renderer.clear(); renderer.render(scene, camera);
-    scene.overrideMaterial = normalMat;
-    renderer.setRenderTarget(rtNormal); renderer.setClearColor(0x000000, 0); renderer.clear(); renderer.render(scene, camera);
-    scene.overrideMaterial = null;
-    renderer.setRenderTarget(null); renderer.render(postScene, postCam);
+    composite();
 
     placeLabels();
     if (inCellar) dirty = true;        // 블랙홀·빛이 움직이니 다음 프레임도 그린다
@@ -524,7 +621,7 @@ const OBST = {      // [x0,x1,z0,z1] 가구 (모델 좌표에서 z 부호를 바
   1: [[0.9, 2.6, -1.35, -0.75], [2.05, 2.65, -0.8, 0.4], [2.1, 2.7, 1.55, 2.05]],          // 카운터 ㄱ자, 난로
   2: [[0.8, 2.7, -2.2, -1.4], [0.85, 1.95, 0.8, 1.4], [-1.9, -1.1, 0.0, 0.8], [2.15, 2.65, -0.05, 0.45], [-1.95, -1.8, -1.6, -0.25]],   // 작업대, 책상, 이젤, 상자, 계단 구멍 난간
   3: [[-2.45, -1.95, 0.85, 1.35], [-1.45, -0.95, 1.15, 1.65], [-1.95, -1.45, 0.95, 1.45], [-2.85, -2.35, 1.65, 2.15], [-1.95, -1.8, -1.6, -0.3], [-2.9, -1.85, -0.35, -0.2]],   // 데크 의자 둘·탁자·화분, 계단 머리 난간
-  B: [[-1.12, -0.88, 0.68, 0.92], [0.88, 1.12, -0.92, -0.68], [1.7, 2.3, 1.2, 1.8], [-0.95, 0.95, 1.35, 1.85], [-0.95, 0.95, -1.85, -1.35]],      // 기둥 둘, 상자, 블랙홀 둘레 긴 의자 둘(남·북)
+  B: [[1.7, 2.3, 1.2, 1.8], [-0.95, 0.95, 1.7, 2.2], [-0.95, 0.95, -2.2, -1.7]],      // 상자, 남·북 벽의 긴 의자 둘
 };
 const TABLES = [[-1.5, 1.3], [-0.6, 0.2], [-1.0, -1.2]];     // 1층 둥근 탁자
 function blocked(x, z, y) {
@@ -532,7 +629,7 @@ function blocked(x, z, y) {
   const inside = Math.abs(x) < 2.7 && Math.abs(z) < 2.2;
   for (const r of OBST[lv]) if (inRect(x, z, r)) return true;
   if (lv === 'B') {
-    if (Math.hypot(x, z) < BH.RADIUS + 0.15) return true;                                      // 블랙홀 — 들어가지 못한다
+    if (Math.hypot(x, z) < 0.9) return true;                                                    // 블랙홀 한가운데(지평선·안쪽 원반)로는 못 들어간다. 바깥 원반 가장자리는 머리 아래로 지난다
     if (inside) return false;
     if (x > TRX0 && x < TRX1 && z > -1.7 && z < 2.0) return false;                        // 구덩이
     if (x >= -3.06 && x <= -2.7 && z > CDOOR[0] && z < CDOOR[1]) return false;              // 문

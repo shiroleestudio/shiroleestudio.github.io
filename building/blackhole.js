@@ -53,8 +53,13 @@ void main(){
         float dens = smoothstep(rin, rin + .35, rc) * pow(1. - smoothstep(rout - 5.5, rout, rc), 1.6);
         dens *= pow(0.35 + 1.0 * fil, 2.6) * (0.7 + 0.6 * fil2) * (0.8 + 0.4 * fil3);
         float T = clamp(1.08 * pow(rin / rc, 0.9), 0., 1.);
-        vec3 vd = normalize(vec3(-sin(ang), 0., cos(ang))) * sqrt(1.0 / rc) * 0.7;
-        float dop = clamp(1.0 + 1.6 * dot(vd, -normalize(vn)), 0.35, 2.0);  // 다가오는 쪽이 밝다
+        // 도플러 빔 δ³ (gargantua-cinema 의 식): 원 궤도 속도 β = 1/√(2(r−1)), δ = 1/(γ(1−βμ)), μ = 속도 방향 · 카메라 쪽. 다가오는 쪽이 훨씬 밝다
+        vec3 vd = normalize(vec3(-sin(ang), 0., cos(ang)));
+        float beta = min(0.99, inversesqrt(2.0 * max(rc - 1.0, 0.05)));
+        float gam = inversesqrt(1.0 - beta * beta);
+        float mu = dot(vd, -normalize(vn));
+        float del = 1.0 / (gam * (1.0 - beta * mu));
+        float dop = clamp(del * del * del, 0.08, 6.0) * 0.55;
         float grav = sqrt(max(0., 1. - 1.0 / rc));                          // 중력 적색편이
         vec3 e = diskColor(T) * dens * dop * grav * (0.35 + 1.9 * pow(rin / rc, 1.7));
         float alpha = clamp(dens * 0.75, 0., 1.);
@@ -93,9 +98,9 @@ void main(){ vec2 uv = gl_FragCoord.xy / res;
   o = vec4(c, a); }`;
 
 export const BH = {
-  CENTER: new THREE.Vector3(0, -1.55, 0),       // 세계 좌표. 지하실 한가운데, 바닥(−2.6) 위 1.05 m — 앉은 눈높이쯤
-  SCALE: 0.074,                                 // m / 셰이더 단위. 원반 바깥 반지름 13.5 단위 = 1.0 m
-  RADIUS: 16 * 0.074,                           // 경계 공 반지름(m). 셰이더의 BOUND 와 같다
+  CENTER: new THREE.Vector3(0, -1.45, 0),       // 세계 좌표. 지하실 한가운데, 바닥(−2.6) 위 1.15 m — 눈높이(1.45) 바로 아래라 살짝 내려다본다
+  SCALE: 0.1185,                                // m / 셰이더 단위. 원반 바깥 반지름 13.5 단위 = 1.6 m (두호: 지하실을 거의 꽉 채우게)
+  RADIUS: 16 * 0.1185,                          // 경계 공 반지름(m) 1.9. 셰이더의 BOUND 와 같다
 };
 
 export function createBlackHole(renderer) {
