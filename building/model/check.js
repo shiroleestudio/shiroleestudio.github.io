@@ -18,10 +18,10 @@ const srv = http.createServer((q, r) => {
 const SPOTS = [
   ['마당', 0.8, 0, 6.6, 0], ['현관 앞', 0.8, 0, 3.0, 0], ['찻집', 0.0, 0.08, 0.5, 0.6],
   ['계단 중간', -2.4, 1.5, -0.85, 0], ['2층', -1.0, 2.9, -1.5, 2.2], ['루프탑', -1.5, 5.6, 0.5, 2.6],
-  ['돌계단', -3.45, -1.3, -0.3, 0], ['지하실', 0.0, -2.6, 0.0, -2.0], ['블랙홀멍', 0.0, -2.6, 0.9, 0],
+  ['돌계단', -3.45, -1.3, -0.3, 0], ['지하실', 1.8, -2.6, 0.3, -2.0], ['블랙홀멍', 0.0, -2.6, 2.0, 0],
 ];
 // 막혀야 하는 자리 [이름, x, y, z]
-const WALLS = [['1층 벽', 2.95, 0.08, 0.0], ['지하 벽', 2.9, -2.6, 0.0], ['지하 긴 의자', 0.0, -2.6, 0.3], ['2층 칸막이', 0.3, 2.9, -1.0], ['데크 밖', -0.3, 5.6, 0.0], ['2층 구멍', -2.4, 2.9, -1.0], ['울타리', 8.5, 0, 0]];
+const WALLS = [['1층 벽', 2.95, 0.08, 0.0], ['지하 벽', 2.9, -2.6, 0.0], ['지하 긴 의자', 0.0, -2.6, 1.6], ['블랙홀', 0.0, -2.6, 0.0], ['2층 칸막이', 0.3, 2.9, -1.0], ['데크 밖', -0.3, 5.6, 0.0], ['2층 구멍', -2.4, 2.9, -1.0], ['울타리', 8.5, 0, 0]];
 const SIZES = [['pc-wide', 1536, 700], ['pc-tall', 1280, 900], ['phone', 390, 844], ['phone-land', 844, 390]];
 srv.listen(0, async () => {
   const port = srv.address().port;
@@ -55,15 +55,25 @@ srv.listen(0, async () => {
         await page.locator('#stage').screenshot({ path: path.join(outDir, `spot-${SPOTS.indexOf(SPOTS.find((s) => s[0] === label)) + 1}-${label}.png`) });
         // 블랙홀은 창을 볼 때만 그려야 한다 (지하실 자리는 남쪽 벽을 보고, 블랙홀멍 자리는 북쪽 창을 본다)
         const bhOn = await page.evaluate(() => window.__house.blackhole);
-        if (label === '블랙홀멍' && !bhOn) bad('관측창을 보는데 블랙홀이 안 그려짐');
+        if (label === '블랙홀멍' && !bhOn) bad('블랙홀을 보는데 그려지지 않음');
         if (label !== '블랙홀멍' && label !== '지하실' && bhOn) bad(`${label} 에서 블랙홀이 그려짐`);
       }
       // 블랙홀은 늘 움직인다: 두 시점의 캡처가 달라야 한다
-      await page.evaluate(() => { window.__house.teleport(0, -2.6, 0.9, 0); window.__house.look(0, 0.0); });
+      await page.evaluate(() => { window.__house.teleport(0, -2.6, 2.0, 0); window.__house.look(0, -0.15); });
       await page.waitForTimeout(400);
       const f1 = await page.locator('#stage').screenshot(); await page.waitForTimeout(700);
       const f2 = await page.locator('#stage').screenshot({ path: path.join(outDir, 'blackhole-2.png') });
       if (f1.equals(f2)) bad('블랙홀이 움직이지 않음');
+      // 멍: 조작이 없으면 배경이 사라진다 (검사에서는 0.3초 뒤부터 1초에 걸쳐)
+      await page.evaluate(() => { window.__house.idle(0.3, 1.0); window.__house.teleport(0, -2.6, 2.0, 0); });
+      await page.waitForTimeout(1800);
+      const fd = await page.evaluate(() => window.__house.fade);
+      if (fd < 0.99) bad(`멍 때려도 배경이 안 사라짐 (fade ${fd})`);
+      await page.locator('#stage').screenshot({ path: path.join(outDir, 'blackhole-idle.png') });
+      await page.evaluate(() => window.__house.idle(6, 14));
+      await page.keyboard.down('KeyA'); await page.waitForTimeout(100); await page.keyboard.up('KeyA'); await page.waitForTimeout(1200);
+      const fd2 = await page.evaluate(() => window.__house.fade);
+      if (fd2 > 0.01) bad(`조작했는데 배경이 안 돌아옴 (fade ${fd2})`);
       for (const [label, x, y, z] of WALLS) {
         const ok = await page.evaluate(([x, y, z]) => { const H = window.__house; H.teleport(0, y, 0); H.player.y = y; return H.canStand(x, z); }, [x, y, z]);
         if (ok) bad(`${label} 을 뚫고 지나감`);
@@ -73,7 +83,7 @@ srv.listen(0, async () => {
       await page.keyboard.down('KeyW'); await page.waitForTimeout(1500); await page.keyboard.up('KeyW');
       const pz = await page.evaluate(() => window.__house.player.z);
       if (pz > 6.5) bad(`앞으로 걸어도 움직이지 않음 (z ${pz.toFixed(2)})`);       // 헤드리스는 느려서 거리는 재지 않는다
-      const doorOk = await page.evaluate(() => { const H = window.__house; H.teleport(0.8, 0.0, 2.6); return H.canStand(0.8, 2.3) && H.canStand(0.8, 2.0); });
+      const doorOk = await page.evaluate(() => { const H = window.__house; H.teleport(0.8, 0.0, 2.8); return [2.6, 2.45, 2.3, 2.0].every((z) => H.canStand(0.8, z)); });   // 문턱(벽 두께 구간 2.37~2.56)도 지나야 한다
       if (!doorOk) bad('현관 문턱을 지날 수 없음');
       // 둘러보기 전환·복귀
       await page.click('[data-walk]'); await page.waitForTimeout(300);

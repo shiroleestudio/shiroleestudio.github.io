@@ -4,12 +4,13 @@
 // 그림체: 툰 4단 명암 + 구운 구석 그늘(모델 정점색) + 해 그림자 + 화면 공간 잉크 외곽선 + 종이 결. 색은 모델 재질 색, 배경은 site.css 토큰.
 // 손가락을 따라 상하·좌우로 돈다. 카메라를 향한 벽·지붕은 걷어 낸다(단면). 방 이름표는 건물 밖 양옆에 세우고 인출선으로 잇는다(HTML 링크).
 // 기본은 1인칭 걷기(두호 2026-11-23: 게임처럼 이용하는 사이트): 마당에서 시작해 현관으로 들어가고, 서쪽 벽 계단으로 2층·루프탑, 바깥 돌계단으로 지하실에 간다 (아래 '1인칭 걷기').
-// 지하실 북쪽 벽 관측창에는 블랙홀이 돈다(blackhole.js, '블랙홀멍'). 창이 보일 때만 저해상도 버퍼에 그리고, 방은 창에서 나오는 주황빛으로 물든다.
+// 지하실 한가운데에는 캠프파이어처럼 블랙홀이 떠서 돈다(blackhole.js, '블랙홀멍'). 보일 때만 저해상도 버퍼에 그리고, 방은 그 주황빛으로 물든다.
+// 가만히 있으면(조작 없음) 방이 서서히 어두워져 블랙홀만 남는다. 조작하면 바로 돌아온다.
 // '둘러보기' 단추로 예전의 돌려 보는 모드(층 떼어 보기·확대)가 된다.
 // 캐릭터는 아직 없다. TODO(character-sheet).
 import * as THREE from 'three';
 import { GLTFLoader } from '../assets/vendor/three/addons/loaders/GLTFLoader.js';
-import { createBlackHole } from './blackhole.js?v=0.10.0';   // 지하실 관측창의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
+import { createBlackHole, BH } from './blackhole.js?v=0.10.0';   // 지하실 한가운데의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
 
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('scene');
@@ -57,13 +58,19 @@ sun.shadow.camera.right = sun.shadow.camera.top = 11;
 sun.shadow.camera.near = 2; sun.shadow.camera.far = 40;
 sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.04;
 scene.add(hemi, sun, sun.target);
-// 지하실: 관측창에서 새어 나오는 블랙홀 빛 (강착 원반 색). 지하에 있을 때만 켜고, 천천히 일렁인다
+// 지하실: 블랙홀(강착 원반)이 내는 주황빛. 지하에 있을 때만 켜고, 모닥불처럼 일렁인다
 const bhLight = new THREE.PointLight(0xff9a4e, 0, 9, 2);
-bhLight.position.set(0, -1.4, -2.2);
+bhLight.position.copy(BH.CENTER);
 bhLight.visible = false;
 scene.add(bhLight);
 const bh = createBlackHole(renderer);
-let bhQuad = null, bhOn = false;
+const bhSphere = new THREE.Mesh(new THREE.SphereGeometry(BH.RADIUS, 24, 16), bh.material);   // 블랙홀이 든 경계 공. 화소마다 셰이더가 광선을 쏜다
+bhSphere.position.copy(BH.CENTER); bhSphere.visible = false; bhSphere.renderOrder = 10;
+scene.add(bhSphere);
+let bhOn = false;
+let lastInput = performance.now(), fade = 0;    // '멍': 조작이 없으면 IDLE_START 초 뒤부터 IDLE_DUR 초에 걸쳐 방이 사라진다
+const IDLE = { start: 6, dur: 14 };
+const touched = () => { lastInput = performance.now(); if (fade > 0) dirty = true; };
 const frustum = new THREE.Frustum(), projView = new THREE.Matrix4();
 
 // 4단 톤 — 수채 그림처럼 명암을 끊는다 (구석 그늘은 모델 정점색이, 해 그림자는 그림자맵이 더한다)
@@ -81,11 +88,12 @@ const post = new THREE.ShaderMaterial({
     tColor: { value: rtColor.texture }, tDepth: { value: rtColor.depthTexture }, tNormal: { value: rtNormal.texture },
     texel: { value: new THREE.Vector2() }, near: { value: camera.near }, far: { value: camera.far },
     ink: { value: new THREE.Color() }, paper: { value: new THREE.Color() }, line: { value: 1.0 },
+    tCover: { value: null }, fade: { value: 0.0 },   // 블랙홀멍: 블랙홀이 덮는 정도(화면 버퍼 알파)와 배경을 지우는 정도
     sky: { value: new THREE.Color() }, night: { value: 0.0 },   // 배경 하늘: 위는 sky, 지평선 쪽은 paper. 밤이면 별
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }',
   fragmentShader: `
-    uniform sampler2D tColor, tDepth, tNormal; uniform vec2 texel; uniform float near, far, line, night;
+    uniform sampler2D tColor, tDepth, tNormal, tCover; uniform vec2 texel; uniform float near, far, line, night, fade;
     uniform vec3 ink, paper, sky; varying vec2 vUv;
     float lin(float z){ return (2.0*near*far)/(far+near-(z*2.0-1.0)*(far-near)); }
     float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }
@@ -114,6 +122,11 @@ const post = new THREE.ShaderMaterial({
       float g = hash(floor(gl_FragCoord.xy)) * 0.035 - 0.0175;          // 종이 결
       float g2 = hash(floor(gl_FragCoord.xy / 3.0) + 7.0) * 0.025 - 0.0125;
       col *= 1.0 + g + g2;
+      if (fade > 0.0) {                                                     // 멍: 블랙홀이 아닌 곳은 어둠으로, 어둠 속에 별이 조금
+        float cov = texture2D(tCover, vUv).a;
+        float st = step(0.9985, hash(floor(gl_FragCoord.xy / 1.5) + 11.0)) * (0.3 + 0.7 * hash(floor(gl_FragCoord.xy / 1.5) + 5.0));
+        col = mix(col, vec3(st * 0.35, st * 0.33, st * 0.4), fade * (1.0 - cov));
+      }
       gl_FragColor = vec4(col, 1.0);
     }`,
   depthTest: false, depthWrite: false,
@@ -150,7 +163,6 @@ let hemiBase = 1.4;          // 테마가 정한 하늘빛 세기 (지하실에�
 
 const toonCache = new Map();
 function toonize(m, vc) {
-  if (m.name === 'glowhole') return bh.material;                                 // 지하 관측창: 블랙홀 버퍼를 읽는 재질
   if (m.name.startsWith('glow')) return new THREE.MeshBasicMaterial({ color: m.color });
   const key = m.name + (vc ? '+vc' : '');
   // map: 모델에 든 생성 텍스처(나뭇결·지붕널·회벽…). vertexColors: 구워 둔 구석 그늘(COLOR_0)을 곱한다 (없는 메시는 재질 색만)
@@ -181,7 +193,6 @@ new GLTFLoader().load(new URL('house.glb', import.meta.url).href, (gltf) => {
     if (ud.floor === -1) cellarNodes.push(o);          // 지하실: 둘러보기(단면)에서는 숨기고 걷기에서만
     if (o.name.startsWith('anchor_')) anchors[o.name.slice(7)] = o;
     if (o.name === 'door') door = o;
-    if (o.name === 'blackhole') bhQuad = o;
   });
   scene.add(house);
   // 화면 맞춤은 집(1~3층)만 — 둘레의 터·언덕(floor 0)은 배경이라 재지 않는다
@@ -254,6 +265,7 @@ const pointers = new Map(); let pinchD = 0;
 const pinchDist = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
 stage.addEventListener('pointerdown', (e) => {
   if (e.target.closest('.callout')) return;
+  touched();
   if (walking) {                       // 1인칭: 왼쪽 반 터치 = 조이스틱, 그 밖(오른쪽·마우스) = 끌어서 둘러보기
     try { stage.setPointerCapture(e.pointerId); } catch (_) { /* 합성 이벤트 */ }
     const b = stage.getBoundingClientRect();
@@ -277,6 +289,7 @@ stage.addEventListener('pointerdown', (e) => {
 });
 stage.addEventListener('pointermove', (e) => {
   if (walking) {
+    if (e.pointerId === joyId || e.pointerId === lookId || locked) touched();
     if (e.pointerId === joyId) {
       const dx = e.clientX - joyOrigin.x, dy = e.clientY - joyOrigin.y;
       const len = Math.hypot(dx, dy), k = len > JOY_R ? JOY_R / len : 1;
@@ -427,11 +440,16 @@ function frame() {
     if (walking) updateNear();
     // 지하실 관측창의 블랙홀: 지하에 있고 창이 화면에 들어올 때만 그린다. 보이는 동안은 매 프레임(동작 줄이기와 무관 — 움직임이 내용이다)
     const inCellar = walking && player.y < -1.0 && player.x > -3.1 && Math.abs(player.z) < 2.3;   // 지하실 안(문턱 포함). 바깥 돌계단에서는 벽 뒤라 안 보인다
-    bhOn = inCellar && bhQuad && frustum.setFromProjectionMatrix(projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)).intersectsObject(bhQuad);
-    bhLight.visible = inCellar; sun.visible = !inCellar;                       // 지하는 해가 안 든다. 하늘빛도 줄여 창이 돋보이게
-    hemi.intensity = inCellar ? hemiBase * 0.3 : hemiBase;
-    if (inCellar) bhLight.intensity = 7 + 1.2 * Math.sin(now * 0.0007) + 0.6 * Math.sin(now * 0.0019);
+    bhSphere.visible = inCellar;
+    bhOn = inCellar && frustum.setFromProjectionMatrix(projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)).intersectsObject(bhSphere);
+    bhLight.visible = inCellar; sun.visible = !inCellar;                       // 지하는 해가 안 든다. 하늘빛도 줄여 블랙홀이 돋보이게
+    hemi.intensity = inCellar ? hemiBase * 0.25 : hemiBase;
+    if (inCellar) bhLight.intensity = 6 + 1.5 * Math.sin(now * 0.0021) + 0.8 * Math.sin(now * 0.0057 + 1.0) + 0.4 * Math.sin(now * 0.013);   // 모닥불처럼
     if (bhOn) bh.render(camera, now / 1000);
+    // 멍: 지하실에서 조작이 없으면 방이 사라진다 (블랙홀 공이 안 보이면 지우지 않는다 — 깜깜해지기만 하니까)
+    const idle = (now - lastInput) / 1000;
+    fade = bhOn ? Math.min(1, Math.max(0, (idle - IDLE.start) / IDLE.dur)) : 0;
+    post.uniforms.fade.value = fade; post.uniforms.tCover.value = bh.coverage();
 
     // 1) 색 2) 법선 3) 외곽선·종이 결
     renderer.setRenderTarget(rtColor); renderer.clear(); renderer.render(scene, camera);
@@ -489,6 +507,7 @@ function surfaceAt(x, z, y) {
   const inTrench = x > TRX0 && x < TRX1 && z > -1.7 && z < 2.0;
   if (inLot && !inFoot && !inTrench) c.push(0);                                      // 마당
   if (inHouse) { c.push(0.08); if (!inRect(x, z, HOLE12)) c.push(2.9); }               // 1층 · 2층
+  if (x > 0.3 && x < 1.3 && z >= 2.37 && z < 2.62) c.push(0.08);                      // 현관 문턱(벽 두께 구간). 이게 없으면 문이 열려도 문턱에서 막힌다 (두호 2026-11-23 보고)
   if (inHouse && x < -0.65 && !inRect(x, z, HOLE23)) c.push(5.6);                      // 루프탑 데크
   if (Math.abs(x) < 2.7 && Math.abs(z) < 2.2) c.push(BZ);                              // 지하실
   if (x > -3.06 && x < -2.7 && z > CDOOR[0] && z < CDOOR[1]) c.push(BZ);               // 지하실 문턱
@@ -505,7 +524,7 @@ const OBST = {      // [x0,x1,z0,z1] 가구 (모델 좌표에서 z 부호를 바
   1: [[0.9, 2.6, -1.35, -0.75], [2.05, 2.65, -0.8, 0.4], [2.1, 2.7, 1.55, 2.05]],          // 카운터 ㄱ자, 난로
   2: [[0.8, 2.7, -2.2, -1.4], [0.85, 1.95, 0.8, 1.4], [-1.9, -1.1, 0.0, 0.8], [2.15, 2.65, -0.05, 0.45], [-1.95, -1.8, -1.6, -0.25]],   // 작업대, 책상, 이젤, 상자, 계단 구멍 난간
   3: [[-2.45, -1.95, 0.85, 1.35], [-1.45, -0.95, 1.15, 1.65], [-1.95, -1.45, 0.95, 1.45], [-2.85, -2.35, 1.65, 2.15], [-1.95, -1.8, -1.6, -0.3], [-2.9, -1.85, -0.35, -0.2]],   // 데크 의자 둘·탁자·화분, 계단 머리 난간
-  B: [[-1.12, -0.88, 0.68, 0.92], [0.88, 1.12, -0.92, -0.68], [1.7, 2.3, 1.2, 1.8], [-0.95, 0.95, 0.05, 0.55]],      // 기둥 둘, 상자, 관측창 앞 긴 의자
+  B: [[-1.12, -0.88, 0.68, 0.92], [0.88, 1.12, -0.92, -0.68], [1.7, 2.3, 1.2, 1.8], [-0.95, 0.95, 1.35, 1.85], [-0.95, 0.95, -1.85, -1.35]],      // 기둥 둘, 상자, 블랙홀 둘레 긴 의자 둘(남·북)
 };
 const TABLES = [[-1.5, 1.3], [-0.6, 0.2], [-1.0, -1.2]];     // 1층 둥근 탁자
 function blocked(x, z, y) {
@@ -513,6 +532,7 @@ function blocked(x, z, y) {
   const inside = Math.abs(x) < 2.7 && Math.abs(z) < 2.2;
   for (const r of OBST[lv]) if (inRect(x, z, r)) return true;
   if (lv === 'B') {
+    if (Math.hypot(x, z) < BH.RADIUS + 0.15) return true;                                      // 블랙홀 — 들어가지 못한다
     if (inside) return false;
     if (x > TRX0 && x < TRX1 && z > -1.7 && z < 2.0) return false;                        // 구덩이
     if (x >= -3.06 && x <= -2.7 && z > CDOOR[0] && z < CDOOR[1]) return false;              // 문
@@ -604,12 +624,12 @@ const KEYMAP = { KeyW: 'f', ArrowUp: 'f', KeyS: 'b', ArrowDown: 'b', KeyA: 'l', 
 addEventListener('keydown', (e) => {
   if (!walking || e.target.closest('input, textarea, button, a')) return;
   if (e.code === 'KeyE' || e.code === 'Enter') { openNear(); return; }
-  if (KEYMAP[e.code]) { keys.add(KEYMAP[e.code]); e.preventDefault(); }
+  if (KEYMAP[e.code]) { keys.add(KEYMAP[e.code]); e.preventDefault(); touched(); }
 });
 addEventListener('keyup', (e) => { if (KEYMAP[e.code]) keys.delete(KEYMAP[e.code]); });
 addEventListener('blur', () => keys.clear());
 // 검토 스크립트(model/check.js)가 쓰는 손잡이. 사이트 기능이 아니다
-window.__house = { get player() { return player; }, get walking() { return walking; }, get near() { return nearRoom; }, get blackhole() { return bhOn; }, setWalking, teleport(x, y, z, yaw) { player.set(x, y, z); if (yaw !== undefined) wYaw = yaw; dirty = true; }, canStand, surfaceAt, look(yaw, pitch) { wYaw = yaw; wPitch = pitch; dirty = true; } };
+window.__house = { get player() { return player; }, get walking() { return walking; }, get near() { return nearRoom; }, get blackhole() { return bhOn; }, get fade() { return fade; }, idle(start, dur) { IDLE.start = start; IDLE.dur = dur; }, setWalking, teleport(x, y, z, yaw) { player.set(x, y, z); if (yaw !== undefined) wYaw = yaw; touched(); dirty = true; }, canStand, surfaceAt, look(yaw, pitch) { wYaw = yaw; wPitch = pitch; dirty = true; } };
 
 // 라벨: 건물 밖 양옆 칸에 세우고, 방까지 인출선으로 잇는다 (도감처럼)
 const NS = 'http://www.w3.org/2000/svg';
