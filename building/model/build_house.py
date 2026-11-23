@@ -350,16 +350,18 @@ gB = group('basement', -1)
 BIX, BIY = W / 2 - 0.3, D / 2 - 0.3         # 안쪽 반 치수
 box(gB, 'stone2', (0, 0, BZ - 0.05), (W + 0.12, D + 0.12, 0.1))                                  # 바닥
 for sgn in (-1, 1):                                                                              # 남·북 벽
-    box(gB, 'stone', (0, sgn * (BIY + 0.18), (BZ - 0.03) / 2), (W + 0.12, 0.36, -BZ - 0.03 + 0.0))
+    box(gB, 'stone', (0, sgn * (BIY + 0.18), (BZ - 0.03) / 2), (W + 0.12, 0.36, -BZ - 0.03))
 box(gB, 'stone', (BIX + 0.18, 0, (BZ - 0.03) / 2), (0.36, D + 0.12, -BZ - 0.03))                 # 동벽
 for y0, y1 in subtract((-D / 2 - 0.06, D / 2 + 0.06), [CELLAR_DOOR]):                           # 서벽 (문 구멍)
     box(gB, 'stone', (-BIX - 0.18, (y0 + y1) / 2, (BZ - 0.03) / 2), (0.36, y1 - y0, -BZ - 0.03))
 box(gB, 'stone', (-BIX - 0.18, sum(CELLAR_DOOR) / 2, -0.35), (0.36, CELLAR_DOOR[1] - CELLAR_DOOR[0], 0.6))   # 문 위 인방
-for (x, y) in ((-1.0, -0.8), (1.0, 0.8)):                                                        # 나무 기둥 둘
-    box(gB, 'beam', (x, y, (BZ - 0.03) / 2), (0.24, 0.24, -BZ - 0.03))
-cyl(gB, 'dark', (0.0, 0.0, -0.35), 0.01, 0.6, seg=4)                                             # 등 하나
-sphere(gB, 'glowbulb', (0.0, 0.0, -0.72), 0.09, seg=8)
 box(gB, 'plank2', (2.0, -1.5, BZ + 0.25), (0.6, 0.6, 0.5))                                       # 상자 하나
+# 블랙홀멍(두호 2026-11-23): 방 한가운데 캠프파이어처럼 블랙홀이 뜬다 — 사이트가 셰이더로 그린다(blackhole.js). 방을 거의 채우는 크기(원반 반지름 1.6 m)라
+# 기둥·등은 없고, 긴 의자 둘은 남·북 벽에 붙여 가운데를 본다. 자리는 building.js OBST.B 와 같다.
+for yb in (-1.95, 1.95):
+    box(gB, 'plank2', (0, yb, BZ + 0.42), (1.8, 0.42, 0.06))
+    for x in (-0.78, 0.78):
+        box(gB, 'beam', (x, yb, BZ + 0.2), (0.08, 0.36, 0.4))
 anchor('cellar', (0.0, 1.2, BZ + 1.4))
 # 구덩이: 돌계단(북→남으로 내려감) + 바닥 + 서쪽·남쪽 옹벽(땅 위 0.5 m 난간)
 gC0 = group('cellar_stairs', 0)
@@ -861,21 +863,55 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import textures
 
 TEX_DIR = tempfile.mkdtemp(prefix='house_tex_')
-TEX = textures.make_all({k: COL[k] for k in textures.RECIPES if k in COL}, TEX_DIR)
+ASSET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'assets')   # 손그림·사진 텍스처가 있으면 생성 대신 쓴다 (building/assets/README.md)
+TEX = textures.make_all({k: COL[k] for k in textures.RECIPES if k in COL}, TEX_DIR, ASSET_DIR)
+
+IMG_CACHE = {}
+def _image(path, name, srgb=True):
+    if path not in IMG_CACHE:
+        img = bpy.data.images.load(path)
+        img.name = name
+        if not srgb:
+            img.colorspace_settings.name = 'Non-Color'
+        img.pack()
+        IMG_CACHE[path] = img
+    return IMG_CACHE[path]
 
 def texture_materials():
-    for key, (path, tiles, swap) in TEX.items():
+    """색 + 법선 + 거칠기(ORM) 를 Principled BSDF 에 잇는다. glTF 내보내기가 normalTexture·metallicRoughnessTexture 로 만든다.
+    법선·ORM 이미지는 변형끼리(textures.FAMILY) 같은 것을 써서 glb 에 한 번만 들어간다."""
+    for key, (path, tiles, swap, npath, opath) in TEX.items():
         m = MATS.get(key)
         if m is None:
             continue
         nt = m.node_tree
         bsdf = nt.nodes.get('Principled BSDF')
-        img = bpy.data.images.load(path)
-        img.name = key
-        img.pack()
         tex = nt.nodes.new('ShaderNodeTexImage')
-        tex.image = img
+        tex.image = _image(path, key)
         nt.links.new(tex.outputs['Color'], bsdf.inputs['Base Color'])
+        if npath:
+            ntex = nt.nodes.new('ShaderNodeTexImage'); ntex.image = _image(npath, os.path.basename(npath)[:-4], srgb=False)
+            nmap = nt.nodes.new('ShaderNodeNormalMap')
+            nt.links.new(ntex.outputs['Color'], nmap.inputs['Color'])
+            nt.links.new(nmap.outputs['Normal'], bsdf.inputs['Normal'])
+        if opath:
+            otex = nt.nodes.new('ShaderNodeTexImage'); otex.image = _image(opath, os.path.basename(opath)[:-4], srgb=False)
+            sep = nt.nodes.new('ShaderNodeSeparateColor')
+            nt.links.new(otex.outputs['Color'], sep.inputs['Color'])
+            nt.links.new(sep.outputs['Green'], bsdf.inputs['Roughness'])
+            nt.links.new(sep.outputs['Blue'], bsdf.inputs['Metallic'])
+    # 텍스처 없는 재질의 거칠기·금속성 (실사 PBR)
+    for key, m in MATS.items():
+        if key in TEX:
+            continue
+        bsdf = m.node_tree.nodes.get('Principled BSDF')
+        rough, metal = ROUGH.get(key, (0.8, 0.0))
+        bsdf.inputs['Roughness'].default_value = rough
+        bsdf.inputs['Metallic'].default_value = metal
+
+ROUGH = {'brass': (0.35, 1.0), 'dark': (0.45, 0.8), 'door': (0.55, 0.0), 'jar': (0.3, 0.0), 'coffee': (0.4, 0.0),
+         'paper': (0.9, 0.0), 'rule': (0.9, 0.0), 'ink': (0.7, 0.0), 'night': (0.5, 0.0), 'rug': (0.95, 0.0), 'blanket': (0.95, 0.0),
+         'pot': (0.7, 0.0), 'leaf': (0.6, 0.0), 'green': (0.7, 0.0), 'sage': (0.7, 0.0), 'red': (0.6, 0.0)}
 
 def project_uvs(objs):
     for o in objs:
