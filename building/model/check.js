@@ -1,6 +1,6 @@
 // 시로의 집 — 걷기 검토 스크립트 (선택 도구, 저장소 의존성 아님. 계획서 7절 '오류 0 검토 루프')
 // 헤드리스 크로미움으로 네 화면 크기에서 첫 화면을 열고, 걷기가 기본으로 켜졌는지, 콘솔 오류·경고가 없는지,
-// 마당→현관→1층→계단→2층→루프탑, 바깥 돌계단→지하실 자리에 설 수 있는지(발높이), 벽을 뚫지 못하는지 확인한 뒤 캡처한다.
+// 마당→현관→1층→계단→2층→루프탑, 바깥 돌계단→지하실 자리에 설 수 있는지(발높이), 벽을 뚫지 못하는지, 지하 관측창의 블랙홀이 창을 볼 때만 그려지고 움직이는지 확인한 뒤 캡처한다.
 // 필요: node + playwright(크로미움). 실행: node building/model/check.js <저장소 뿌리> <출력 폴더>
 // building.js 가 window.__house 로 내놓는 손잡이(teleport·canStand·surfaceAt·look)를 쓴다.
 const http = require('http'), fs = require('fs'), path = require('path');
@@ -18,10 +18,10 @@ const srv = http.createServer((q, r) => {
 const SPOTS = [
   ['마당', 0.8, 0, 6.6, 0], ['현관 앞', 0.8, 0, 3.0, 0], ['찻집', 0.0, 0.08, 0.5, 0.6],
   ['계단 중간', -2.4, 1.5, -0.85, 0], ['2층', -1.0, 2.9, -1.5, 2.2], ['루프탑', -1.5, 5.6, 0.5, 2.6],
-  ['돌계단', -3.45, -1.3, -0.3, 0], ['지하실', 0.0, -2.6, 0.0, -2.0],
+  ['돌계단', -3.45, -1.3, -0.3, 0], ['지하실', 0.0, -2.6, 0.0, -2.0], ['블랙홀멍', 0.0, -2.6, 0.9, 0],
 ];
 // 막혀야 하는 자리 [이름, x, y, z]
-const WALLS = [['1층 벽', 2.95, 0.08, 0.0], ['지하 벽', 2.9, -2.6, 0.0], ['2층 칸막이', 0.3, 2.9, -1.0], ['데크 밖', -0.3, 5.6, 0.0], ['2층 구멍', -2.4, 2.9, -1.0], ['울타리', 8.5, 0, 0]];
+const WALLS = [['1층 벽', 2.95, 0.08, 0.0], ['지하 벽', 2.9, -2.6, 0.0], ['지하 긴 의자', 0.0, -2.6, 0.3], ['2층 칸막이', 0.3, 2.9, -1.0], ['데크 밖', -0.3, 5.6, 0.0], ['2층 구멍', -2.4, 2.9, -1.0], ['울타리', 8.5, 0, 0]];
 const SIZES = [['pc-wide', 1536, 700], ['pc-tall', 1280, 900], ['phone', 390, 844], ['phone-land', 844, 390]];
 srv.listen(0, async () => {
   const port = srv.address().port;
@@ -53,7 +53,17 @@ srv.listen(0, async () => {
         await page.evaluate(([x, y, z, yaw]) => { window.__house.teleport(x, y, z, yaw); window.__house.look(yaw, 0.02); }, [x, y, z, yaw]);
         await page.waitForTimeout(400);
         await page.locator('#stage').screenshot({ path: path.join(outDir, `spot-${SPOTS.indexOf(SPOTS.find((s) => s[0] === label)) + 1}-${label}.png`) });
+        // 블랙홀은 창을 볼 때만 그려야 한다 (지하실 자리는 남쪽 벽을 보고, 블랙홀멍 자리는 북쪽 창을 본다)
+        const bhOn = await page.evaluate(() => window.__house.blackhole);
+        if (label === '블랙홀멍' && !bhOn) bad('관측창을 보는데 블랙홀이 안 그려짐');
+        if (label !== '블랙홀멍' && label !== '지하실' && bhOn) bad(`${label} 에서 블랙홀이 그려짐`);
       }
+      // 블랙홀은 늘 움직인다: 두 시점의 캡처가 달라야 한다
+      await page.evaluate(() => { window.__house.teleport(0, -2.6, 0.9, 0); window.__house.look(0, 0.0); });
+      await page.waitForTimeout(400);
+      const f1 = await page.locator('#stage').screenshot(); await page.waitForTimeout(700);
+      const f2 = await page.locator('#stage').screenshot({ path: path.join(outDir, 'blackhole-2.png') });
+      if (f1.equals(f2)) bad('블랙홀이 움직이지 않음');
       for (const [label, x, y, z] of WALLS) {
         const ok = await page.evaluate(([x, y, z]) => { const H = window.__house; H.teleport(0, y, 0); H.player.y = y; return H.canStand(x, z); }, [x, y, z]);
         if (ok) bad(`${label} 을 뚫고 지나감`);

@@ -7,7 +7,7 @@
 # 사이트가 읽는 약속 (building.js):
 #  - 노드 extras: floor(1·2·3, 0=땅, -1=지하실), cut('S','N','E','W' = 카메라가 그쪽에 있으면 걷어낼 면).
 #  - 빈 객체 anchor_<id>: 방 라벨이 붙는 자리.
-#  - 재질 이름 glow*: 불 켜진 창·전구 (조명 없이 그 색 그대로).
+#  - 재질 이름 glow*: 불 켜진 창·전구 (조명 없이 그 색 그대로). glowhole 은 지하 관측창(블랙홀 셰이더 자리).
 # 캐릭터(시로·카피바라씨·코알라씨)는 넣지 않는다. TODO(character-sheet).
 import math
 import random
@@ -31,7 +31,7 @@ COL = {
     'leaf': '#6f7f5c', 'pot': '#b07a5c', 'brass': '#a88a55', 'night': '#2b3240',
     'door': '#2f3640', 'rug': '#b89a7a', 'red': '#a85a48', 'cream': '#ece4d2',
     'blanket': '#8d98a0', 'jar': '#cfc8b4', 'coffee': '#5b4130',
-    'glow': '#f0d394', 'glowbulb': '#f6e2b0',
+    'glow': '#f0d394', 'glowbulb': '#f6e2b0', 'glowhole': '#000000',   # glowhole: 지하 관측창 — 사이트가 블랙홀 셰이더로 바꿔 그린다
 }
 
 def srgb_to_lin(c):
@@ -349,8 +349,26 @@ slab(g0, 'grass', (0, 0, -0.1), (LOT_W, LOT_D, 0.2), [HOLE_HOUSE, (TRX0, TRX1, T
 gB = group('basement', -1)
 BIX, BIY = W / 2 - 0.3, D / 2 - 0.3         # 안쪽 반 치수
 box(gB, 'stone2', (0, 0, BZ - 0.05), (W + 0.12, D + 0.12, 0.1))                                  # 바닥
-for sgn in (-1, 1):                                                                              # 남·북 벽
-    box(gB, 'stone', (0, sgn * (BIY + 0.18), (BZ - 0.03) / 2), (W + 0.12, 0.36, -BZ - 0.03 + 0.0))
+box(gB, 'stone', (0, -(BIY + 0.18), (BZ - 0.03) / 2), (W + 0.12, 0.36, -BZ - 0.03))               # 남벽
+# 북벽: 블랙홀 관측창(2단계 블랙홀멍). 벽을 뚫은 구멍 안쪽 깊숙이 'glowhole' 판을 세우고, 사이트가 그 판에 블랙홀 셰이더를 그린다.
+# 수치는 building.js 의 BH_WIN 과 같아야 한다 (가로 ±1.7, 바닥 BZ+0.75 ~ BZ+2.15).
+WIN_X, WIN_Z0, WIN_Z1 = 1.7, BZ + 0.75, BZ + 2.15
+NWY = BIY + 0.18
+for x0, x1 in ((-W / 2 - 0.06, -WIN_X), (WIN_X, W / 2 + 0.06)):                                  # 창 양옆
+    box(gB, 'stone', ((x0 + x1) / 2, NWY, (BZ - 0.03) / 2), (x1 - x0, 0.36, -BZ - 0.03))
+box(gB, 'stone', (0, NWY, (BZ + WIN_Z0) / 2), (2 * WIN_X, 0.36, WIN_Z0 - BZ))                       # 창 아래
+box(gB, 'stone', (0, NWY, (WIN_Z1 - 0.03) / 2), (2 * WIN_X, 0.36, -0.03 - WIN_Z1))                  # 창 위
+for x0, x1 in ((-WIN_X - 0.1, -WIN_X), (WIN_X, WIN_X + 0.1)):                                     # 쇠틀 (방 쪽으로 2 cm 나옴)
+    box(gB, 'dark', ((x0 + x1) / 2, BIY + 0.04, (WIN_Z0 + WIN_Z1) / 2), (0.1, 0.1, WIN_Z1 - WIN_Z0 + 0.2))
+for z in (WIN_Z0 - 0.05, WIN_Z1 + 0.05):
+    box(gB, 'dark', (0, BIY + 0.04, z), (2 * WIN_X, 0.1, 0.1))
+box(gB, 'stone2', (0, BIY - 0.08, WIN_Z0 - 0.14), (2 * WIN_X + 0.5, 0.3, 0.08))                     # 창턱
+gBH = group('blackhole', -1)                                                                     # 관측창 유리 자리: 사이트가 블랙홀을 그리는 판 (따로 떼어 보이는지 가린다)
+box(gBH, 'glowhole', (0, BIY + 0.3, (WIN_Z0 + WIN_Z1) / 2), (2 * WIN_X, 0.02, WIN_Z1 - WIN_Z0))
+# 창을 보고 앉는 긴 의자 (building.js OBST.B 와 같은 자리)
+box(gB, 'plank2', (0, -0.3, BZ + 0.42), (1.8, 0.42, 0.06))
+for x in (-0.78, 0.78):
+    box(gB, 'beam', (x, -0.3, BZ + 0.2), (0.08, 0.36, 0.4))
 box(gB, 'stone', (BIX + 0.18, 0, (BZ - 0.03) / 2), (0.36, D + 0.12, -BZ - 0.03))                 # 동벽
 for y0, y1 in subtract((-D / 2 - 0.06, D / 2 + 0.06), [CELLAR_DOOR]):                           # 서벽 (문 구멍)
     box(gB, 'stone', (-BIX - 0.18, (y0 + y1) / 2, (BZ - 0.03) / 2), (0.36, y1 - y0, -BZ - 0.03))
