@@ -10,7 +10,7 @@
 // 캐릭터는 아직 없다. TODO(character-sheet).
 import * as THREE from 'three';
 import { GLTFLoader } from '../assets/vendor/three/addons/loaders/GLTFLoader.js';
-import { createBlackHole, BH } from './blackhole.js?v=0.11.0';   // 지하실 한가운데의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
+import { createBlackHole, BH } from './blackhole.js?v=0.11.1';   // 지하실 한가운데의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
 
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('scene');
@@ -171,10 +171,10 @@ const post = new THREE.ShaderMaterial({
       col += vec3(0.018, 0.01, 0.038) * (1.0 - lum) * smoothstep(0.0, 0.06, lum);   // 순검정(블랙홀 지평선)은 그대로 둔다
       col = mix(col, col * vec3(1.03, 1.0, 0.96), lum);
       col = mix(vec3(lum), col, 1.12);
-      col = mix(col, col * col * (3.0 - 2.0 * col), 0.3);                   // 살짝 S 자 대비
+      col = mix(col, col * col * (3.0 - 2.0 * col), 0.2);                   // 살짝 S 자 대비
       col = pow(max(col, 0.0), vec3(1.0 / 2.2));
       // 비네트 + 필름 그레인(화소마다 고정 — 깜빡이지 않는다)
-      col *= 1.0 - 0.2 * dot(q, q) * 0.7;
+      col *= 1.0 - 0.14 * dot(q, q) * 0.7;
       float g = hash(floor(gl_FragCoord.xy)) - 0.5;
       col += g * 0.022;
       if (fade > 0.0) {                                                     // 멍: 블랙홀이 아닌 곳은 어둠으로, 어둠 속에 별이 조금
@@ -211,16 +211,16 @@ function applyTheme() {
   // 낮: 연한 라벤더-파랑 하늘, 크림빛 지평선, 따뜻한 해. 밤: 먹빛 남색, 별·달, 차가운 달빛 — 창은 노랗게 빛난다
   u.zen.value.setStyle(dark ? '#0d1226' : '#7f9bd0', THREE.SRGBColorSpace);
   u.hor.value.setStyle(dark ? '#262c48' : '#eadfcb', THREE.SRGBColorSpace);
-  u.fogCol.value.setStyle(dark ? '#1a2038' : '#d9d2c8', THREE.SRGBColorSpace);
+  u.fogCol.value.setStyle(dark ? '#242c4c' : '#d9d2c8', THREE.SRGBColorSpace);
   u.sunCol.value.setStyle(dark ? '#334066' : '#ffe2b0', THREE.SRGBColorSpace);
   u.night.value = dark ? 1 : 0;
-  fogBase = dark ? 0.010 : 0.006; u.fogDensity.value = fogBase;
-  u.exposure.value = dark ? 1.1 : 1.0;
+  fogBase = dark ? 0.008 : 0.006; u.fogDensity.value = fogBase;
+  u.exposure.value = dark ? 1.5 : 1.2;   // 소유자 피드백(2026-11-24) '너무 어둡다' — 밤은 달빛이 충분히 비추게, 낮도 한 단 밝게
   u.cloud.value = dark ? 0.35 : 1.0;
   e.zen.value.copy(u.zen.value); e.hor.value.copy(u.hor.value); e.sunCol.value.copy(u.sunCol.value);
   e.gnd.value.setStyle(dark ? '#141412' : '#6f6a55', THREE.SRGBColorSpace);
-  hemiBase = dark ? 0.18 : 0.55; hemi.intensity = hemiBase;
-  sun.intensity = dark ? 0.35 : 3.0;
+  hemiBase = dark ? 0.75 : 0.8; hemi.intensity = hemiBase;
+  sun.intensity = dark ? 1.4 : 3.0;
   sun.color.set(dark ? 0x9fb3e6 : 0xfff0d8);
   hemi.color.set(dark ? 0x7f90b8 : 0xfff6e4);
   glowBoost = dark ? 3.2 : 1.6;
@@ -401,7 +401,7 @@ function frame() {
 
 // ---- 1인칭 걷기 (두호 2026-11-18: 남코뮤지엄처럼 들어가 보기 · 2026-11-23: 기본 모드, 계단·지하실) ----
 // 울타리 문 앞에서 시작해 마당을 걷고, 현관으로 1층 찻집에 들어간다. 찻집 서쪽 벽 계단으로 2층, 그 위 계단으로 루프탑 데크. 집 서쪽 바깥 돌계단으로 지하실.
-// 다락(놀이방·천문대)은 지붕이 낮아 들어가지 않고 데크에서 본다 — 집을 다시 만드는 3단계에서 문을 낸다.
+// 다락(놀이방·천문대)은 데크에서 서쪽 지붕면의 도머 입구(z 0.05~0.95)로 걸어 들어간다(2026-11-24). 지붕이 낮은 양옆(|x-1.2| > 0.98)은 못 간다.
 // 키보드 WASD·방향키. 터치는 모바일 FPS 식: 왼쪽 반을 누른 자리에 조이스틱이 떠서 밀면 걷고, 오른쪽 반을 끌면 둘러본다(두 손가락 동시 가능).
 // 마우스는 클릭하면 잠겨 움직이는 대로 둘러본다(Esc 로 풀림). 잠기지 않으면 끌어서 돌린다.
 // three 좌표: 모델의 남쪽(정문)이 +z, 위가 +y. 집 발자국 ±3 × ±2.5, 현관은 x 0.35~1.25 의 남쪽 벽.
@@ -440,7 +440,7 @@ function surfaceAt(x, z, y) {
   if (inLot && !inFoot && !inTrench) c.push(0);                                      // 마당
   if (inHouse) { c.push(0.08); if (!inRect(x, z, HOLE12)) c.push(2.9); }               // 1층 · 2층
   if (x > 0.3 && x < 1.3 && z >= 2.37 && z < 2.62) c.push(0.08);                      // 현관 문턱(벽 두께 구간). 이게 없으면 문이 열려도 문턱에서 막힌다 (두호 2026-11-23 보고)
-  if (inHouse && x < -0.65 && !inRect(x, z, HOLE23)) c.push(5.6);                      // 루프탑 데크
+  if (inHouse && !inRect(x, z, HOLE23)) c.push(5.6);                                   // 루프탑 데크 + 다락 바닥 (어디가 설 수 있는 곳인지는 blocked 가 가른다)
   if (Math.abs(x) < 2.7 && Math.abs(z) < 2.2) c.push(BZ);                              // 지하실
   if (x > -3.06 && x < -2.7 && z > CDOOR[0] && z < CDOOR[1]) c.push(BZ);               // 지하실 문턱
   if (onRamp(R12, SX0, SX1, x, z)) c.push(rampY(R12, z));
@@ -453,9 +453,10 @@ function surfaceAt(x, z, y) {
 // 벽·가구. 층은 발높이로 가른다
 const LEVEL = (y) => (y < -1.3 ? 'B' : y < 1.5 ? 1 : y < 4.3 ? 2 : 3);
 const OBST = {      // [x0,x1,z0,z1] 가구 (모델 좌표에서 z 부호를 바꾼 것)
-  1: [[0.9, 2.6, -1.35, -0.75], [2.05, 2.65, -0.8, 0.4], [2.1, 2.7, 1.55, 2.05]],          // 카운터 ㄱ자, 난로
+  1: [[0.9, 2.6, -1.35, -0.75], [2.05, 2.65, -0.8, 0.4], [2.1, 2.7, 1.55, 2.05], [-0.05, 0.25, 3.35, 3.65], [1.35, 1.65, 3.35, 3.65]],   // 카운터 ㄱ자, 난로, 현관 포치 기둥 둘(모델 PX0·PX1·PY)
   2: [[0.8, 2.7, -2.2, -1.4], [0.85, 1.95, 0.8, 1.4], [-1.9, -1.1, 0.0, 0.8], [2.15, 2.65, -0.05, 0.45], [-1.95, -1.8, -1.6, -0.25]],   // 작업대, 책상, 이젤, 상자, 계단 구멍 난간
-  3: [[-2.45, -1.95, 0.85, 1.35], [-1.45, -0.95, 1.15, 1.65], [-1.95, -1.45, 0.95, 1.45], [-2.85, -2.35, 1.65, 2.15], [-1.95, -1.8, -1.6, -0.3], [-2.9, -1.85, -0.35, -0.2]],   // 데크 의자 둘·탁자·화분, 계단 머리 난간
+  3: [[-2.45, -1.95, 0.85, 1.35], [-1.45, -0.95, 1.15, 1.65], [-1.95, -1.45, 0.95, 1.45], [-2.85, -2.35, 1.65, 2.15], [-1.95, -1.8, -1.6, -0.3], [-2.9, -1.85, -0.35, -0.2],
+      [0.6, 1.0, 0.7, 1.1], [1.75, 2.75, 1.2, 2.2], [1.8, 2.3, -0.15, 0.35], [0.45, 0.95, -2.05, -1.55]],   // 데크 의자 둘·탁자·화분, 계단 머리 난간 / 다락: 장난감 로켓, 텐트, 삼각대, 지구본 탁자
   B: [[1.7, 2.3, 1.2, 1.8], [-0.95, 0.95, 1.7, 2.2], [-0.95, 0.95, -2.2, -1.7]],      // 상자, 남·북 벽의 긴 의자 둘
 };
 const TABLES = [[-1.5, 1.3], [-0.6, 0.2], [-1.0, -1.2]];     // 1층 둥근 탁자
@@ -471,8 +472,11 @@ function blocked(x, z, y) {
     return true;
   }
   if (lv === 3) {
-    if (!(x > -2.85 && x < -0.65 && Math.abs(z) < 2.3)) return true;                         // 데크 밖(난간·무릎벽)
-    return false;
+    // 데크(서쪽) / 도머 통로(모델 YD0..YD1·XA..XD 를 z 부호만 바꾼 것) / 다락 가운데(지붕이 머리 위 1.5 m 넘는 x 구간: |x-1.2| < 0.98)
+    const deck = x > -2.85 && x < -0.65 && Math.abs(z) < 2.3;
+    const dormer = x >= -0.75 && x < 0.22 && z > 0.05 && z < 0.95;
+    const attic = x >= 0.22 && x < 2.18 && Math.abs(z) < 2.2;
+    return !(deck || dormer || attic);
   }
   if (lv === 2) {
     if (!inside) return true;

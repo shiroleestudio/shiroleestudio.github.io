@@ -255,7 +255,7 @@ for side in 'SNEW':
             for uu in (u0 - 0.05, u1 + 0.05):
                 wbox(g, 'wood2', side, uu, (v0 + v1) / 2, 0.02, 0.1, v1 - v0, T + 0.1)
             wbox(g, 'wood2', side, (u0 + u1) / 2, v1 + 0.05, 0.02, u1 - u0 + 0.2, 0.1, T + 0.1)
-            wbox(g, 'paper', side, (u0 + u1) / 2, 1.55, 0.1, 0.42, 0.2, 0.03)   # 문패 (글자는 코드로)
+            wbox(gDoor, 'paper', side, (u0 + u1) / 2, 1.55, 0.1, 0.42, 0.2, 0.03)   # 문패 — 문짝 노드에 붙여 문과 함께 돈다 (벽에 두면 문이 열릴 때 공중에 남는다)
             cyl(gDoor, 'brass', wpos(side, u0 + 0.16, 1.0, 0.09), 0.04, 0.08, axis='Y' if side in 'SN' else 'X', seg=8)
 
 # 띠보 (층 사이) — 앞뒤 면에 붙여 같이 걷힌다
@@ -392,28 +392,72 @@ def roof_z(x):
 # 무릎벽 (동·서) — 동쪽은 바깥벽 위, 서쪽은 루프탑과의 경계
 gE = group('f3_roof_E', 3, 'E')
 gW = group('f3_roof_W', 3, 'W')
+# 다락 출입구(2026-11-24, 집 리모델링): 데크에서 서쪽 지붕면에 낸 셰드 도머(평지붕 돌출부) 로 걸어 들어간다.
+# y 구간 YD0..YD1, x 는 데크 가장자리(XA) 에서 XD 까지. 그 안쪽은 지붕이 높아(용마루 2.7 m) 그냥 선다. building.js 의 3층 걷기 범위와 같아야 한다.
+YD0, YD1, XD, HD = -1.05, 0.05, 0.72, Z3 + 2.1          # 도머 y 구간, 안쪽 끝 x, 도머 천장 높이
 for i in range(int(D / 0.3)):
     y = -D / 2 + 0.15 + i * 0.3
     box(gE, 'plank' if i % 3 else 'plank2', (XB - 0.1, y, Z3 + KNEE / 2), (0.07, 0.28, KNEE))
-    box(gW, 'plank' if i % 3 else 'plank2', (XA + 0.1, y, Z3 + KNEE / 2), (0.07, 0.28, KNEE))
+    if not (YD0 < y < YD1):
+        box(gW, 'plank' if i % 3 else 'plank2', (XA + 0.1, y, Z3 + KNEE / 2), (0.07, 0.28, KNEE))
 box(gE, 'plaster', (XB - 0.17, 0, Z3 + KNEE / 2), (0.04, D - 0.3, KNEE))
-box(gW, 'plaster', (XA + 0.17, 0, Z3 + KNEE / 2), (0.04, D - 0.3, KNEE))
+for y0_, y1_ in ((-D / 2 + 0.15, YD0), (YD1, D / 2 - 0.15)):
+    box(gW, 'plaster', (XA + 0.17, (y0_ + y1_) / 2, Z3 + KNEE / 2), (0.04, y1_ - y0_, KNEE))
 
 # 지붕 경사판 + 지붕널
 ang = math.atan2(RIDGE, AW / 2)
 slope_len = math.hypot(RIDGE, AW / 2) + 0.45
+def slope_box(g, mk, sgn, cx, cz, t0, t1, y0, y1, lift, thick, pad=0.0):
+    """경사면 위의 판 한 조각: 경사 방향 구간 t0..t1(-0.5..0.5, 경사 길이 비율), y 구간, 면에서 lift 만큼 띄움"""
+    tm = (t0 + t1) / 2
+    off = Vector((sgn * math.cos(ang), 0, -math.sin(ang))) * (tm * slope_len)
+    up = Vector((sgn * math.sin(ang), 0, math.cos(ang))) * lift
+    p = Vector((cx, (y0 + y1) / 2, cz)) + off + up
+    box(g, mk, tuple(p), ((t1 - t0) * slope_len + pad, y1 - y0, thick), rot=(0, sgn * ang, 0))
+
 for side, g, sgn in (('E', gE, 1), ('W', gW, -1)):
     cx = XR + sgn * (AW / 4) + sgn * 0.12
     cz = ZK + RIDGE / 2 - 0.08
-    rot = (0, sgn * ang, 0)          # Blender Y 회전: +각이면 x축이 아래로 기운다
-    box(g, 'plank', (cx, 0, cz), (slope_len, D + 0.6, 0.1), rot=rot)
+    # 서쪽 경사면에서 도머가 차지하는 경사 구간: x < XD 인 부분 (t>0 이 처마 쪽)
+    t_cut = (cx - XD) / (math.cos(ang) * slope_len) if side == 'W' else None      # 이 t 보다 처마 쪽은 도머 y 구간에서 비운다
+    ybands = [(-D / 2 - 0.3, D / 2 + 0.3)] if side == 'E' else [(-D / 2 - 0.3, YD0), (YD1, D / 2 + 0.3)]
+    # 경사판
+    if side == 'E':
+        slope_box(g, 'plank', sgn, cx, cz, -0.5, 0.5, -D / 2 - 0.3, D / 2 + 0.3, 0.0, 0.1)
+    else:
+        for y0_, y1_ in ybands:
+            slope_box(g, 'plank', sgn, cx, cz, -0.5, 0.5, y0_, y1_, 0.0, 0.1)
+        slope_box(g, 'plank', sgn, cx, cz, -0.5, t_cut, YD0, YD1, 0.0, 0.1)                 # 도머 위쪽(용마루 쪽)은 지붕 그대로
     rows = 10
     for k in range(rows):
-        t = (k + 0.5) / rows - 0.5
-        off = Vector((sgn * math.cos(ang), 0, -math.sin(ang))) * (t * slope_len)
-        up = Vector((sgn * math.sin(ang), 0, math.cos(ang))) * 0.07
-        p = Vector((cx, 0, cz)) + off + up
-        box(g, 'shingle' if k % 2 else 'shingle2', tuple(p), (slope_len / rows + 0.04, D + 0.64, 0.05), rot=rot)
+        t0, t1 = k / rows - 0.5, (k + 1) / rows - 0.5
+        mk = 'shingle' if k % 2 else 'shingle2'
+        if side == 'E' or t1 <= t_cut:
+            slope_box(g, mk, sgn, cx, cz, t0, t1, -D / 2 - 0.32, D / 2 + 0.32, 0.07, 0.05, pad=0.04)
+        else:
+            for y0_, y1_ in ybands:
+                slope_box(g, mk, sgn, cx, cz, t0, t1, y0_ - 0.02, y1_ + 0.02, 0.07, 0.05, pad=0.04)
+            if t0 < t_cut:
+                slope_box(g, mk, sgn, cx, cz, t0, t_cut, YD0, YD1, 0.07, 0.05, pad=0.04)
+    # 처마 밑 서까래 끝 (동쪽 처마는 바깥에서 보인다)
+    if side == 'E':
+        ex = cx + math.cos(ang) * slope_len * 0.5 - 0.25
+        for i in range(int(D / 0.6) + 1):
+            y = -D / 2 - 0.1 + i * 0.6
+            box(g, 'wood2', (ex, y, cz - math.tan(ang) * (ex - cx) - 0.13), (0.5, 0.08, 0.12), rot=(0, ang, 0))   # 경사판 바로 밑
+# 도머: 옆벽 둘(오각형), 평지붕 + 지붕널, 문틀 (문짝 없이 열린 입구)
+gDm = group('f3_dormer', 3)
+for yw in (YD0 - 0.04, YD1 + 0.04):
+    prism(gDm, 'plank2', [(XA - 0.15, Z3), (XA - 0.15, HD), (XD, HD), (XD, roof_z(XD) - 0.1), (XA - 0.15, ZK - 0.08)], yw - 0.04, yw + 0.04)
+    prism(gDm, 'plaster', [(XA - 0.1, Z3), (XA - 0.1, HD - 0.02), (XD - 0.02, HD - 0.02), (XD - 0.02, roof_z(XD) - 0.12), (XA - 0.1, ZK - 0.08)],
+          yw - 0.04 + (0.06 if yw < 0 else -0.06), yw + 0.04 + (0.06 if yw < 0 else -0.06))
+box(gDm, 'plank', ((XA - 0.3 + XD + 0.05) / 2, (YD0 + YD1) / 2, HD + 0.06), (XD + 0.05 - (XA - 0.3), YD1 - YD0 + 0.3, 0.12))
+box(gDm, 'shingle', ((XA - 0.3 + XD + 0.05) / 2, (YD0 + YD1) / 2, HD + 0.15), (XD + 0.05 - (XA - 0.3) + 0.04, YD1 - YD0 + 0.34, 0.06))
+box(gDm, 'wood2', (XA - 0.3, (YD0 + YD1) / 2, HD + 0.08), (0.06, YD1 - YD0 + 0.34, 0.2))        # 앞 테두리 판
+for yp in (YD0 + 0.05, YD1 - 0.05):
+    box(gDm, 'wood2', (XA - 0.08, yp, (Z3 + HD - 0.1) / 2), (0.1, 0.1, HD - 0.1 - Z3))              # 문설주
+box(gDm, 'wood2', (XA - 0.08, (YD0 + YD1) / 2, HD - 0.15), (0.1, YD1 - YD0, 0.1))                 # 문미
+box(gDm, 'beam', (XA - 0.08, (YD0 + YD1) / 2, Z3 + 0.02), (0.14, YD1 - YD0, 0.04))                 # 문턱
 # 용마루
 box(gW, 'dark', (XR, 0, ZK + RIDGE + 0.05), (0.26, D + 0.7, 0.22))
 
@@ -632,6 +676,20 @@ for (x, y, s) in [(-6.5, -4.5, 1.6), (-7.0, 3.5, 1.9), (6.8, 4.5, 1.7), (7.2, -3
     cyl(gx, 'wood2', (x, y, 0.45 * s), 0.11 * s, 0.9 * s, seg=8)
     sphere(gx, 'leaf', (x, y, 1.25 * s), 0.62 * s, seg=12, scale=(1, 1, 1.15))
     sphere(gx, 'sage', (x + 0.25 * s, y - 0.2 * s, 1.5 * s), 0.38 * s, seg=10)
+# 현관 포치 지붕 (2026-11-24): 기둥 둘 + 바깥으로 기운 작은 지붕. building.js OBST[1] 의 기둥 자리와 같아야 한다
+PX0, PX1, PY = 0.1, 1.5, -D / 2 - 1.0
+for px in (PX0, PX1):
+    cyl(gx, 'beam', (px, PY, 1.15), 0.06, 2.3, seg=8)
+    box(gx, 'stone2', (px, PY, 0.08), (0.3, 0.3, 0.16))
+    box(gx, 'wood2', (px, PY + 0.3, 2.2), (0.08, 0.7, 0.08), rot=(0.7, 0, 0))                       # 버팀대
+pang = 0.32
+box(gx, 'plank', ((PX0 + PX1) / 2, PY + 0.05, 2.58), (PX1 - PX0 + 0.5, 1.45, 0.08), rot=(pang, 0, 0))
+for k in range(4):
+    yy = PY - 0.5 + (k + 0.5) * 0.36
+    zz = 2.58 + 0.07 + (yy - PY - 0.05) * math.tan(pang)
+    box(gx, 'shingle' if k % 2 else 'shingle2', ((PX0 + PX1) / 2, yy, zz), (PX1 - PX0 + 0.54, 0.4, 0.05), rot=(pang, 0, 0))
+box(gx, 'wood2', ((PX0 + PX1) / 2, PY - 0.68, 2.58 - 0.73 * math.tan(pang)), (PX1 - PX0 + 0.54, 0.06, 0.16), rot=(pang, 0, 0))   # 앞 테두리 판
+sphere(gx, 'glowbulb', ((PX0 + PX1) / 2, PY + 0.4, 2.25), 0.07, seg=8)                               # 현관 등
 # 가로등 (길 옆) 과 우편함 (울타리 문 옆)
 cyl(gx, 'dark', (1.7, -D / 2 - 2.6, 1.2), 0.05, 2.4, seg=6)
 box(gx, 'dark', (1.7, -D / 2 - 2.6, 2.45), (0.3, 0.3, 0.3))

@@ -269,11 +269,21 @@ FAMILY = {'log2': 'log', 'plank2': 'plank', 'wood2': 'beam', 'cream': 'plaster',
 COLOR_SIZE = {'log': 1024, 'plank': 1024, 'floor': 1024, 'shingle': 1024, 'stone': 1024, 'grass': 1024, 'plaster': 1024}
 
 
+def _find(asset_dir, stem):
+    """에셋 폴더의 textures/<stem>.(png|jpg|webp) 중 있는 것 — 사진 텍스처는 jpg·webp 가 저장소를 덜 차지한다"""
+    import os
+    for ext in ('.png', '.jpg', '.webp'):
+        p = os.path.join(asset_dir, 'textures', stem + ext)
+        if os.path.exists(p):
+            return p
+    return None
+
+
 def make_all(colors, out_dir, asset_dir=None):
     """colors: 키→'#rrggbb'. out_dir 에 <키>.png(색), <키>_n.png(법선), <키>_orm.png(거칠기) 를 쓰고
     {키: (색 경로, 타일/m, 세로결, 법선 경로, orm 경로)} 를 돌려준다. 변형(FAMILY)은 원본 키의 법선·orm 을 가리킨다.
-    asset_dir/textures/<키>.png 가 있으면(손그림·사진 텍스처, building/assets/README.md) 생성 대신 그 그림을 쓴다 —
-    <키>_n.png·<키>_orm.png 도 있으면 같이, 없으면 생성한 법선·거칠기를 쓴다."""
+    asset_dir/textures/<키>.(png|jpg|webp) 가 있으면(손그림·사진 텍스처, building/assets/README.md) 생성 대신 그 그림을 쓴다 —
+    <키>_n·<키>_orm 도 있으면 같이, 없으면 생성한 법선·거칠기를 쓴다."""
     import os
     out = {}; maps = {}; custom = {}
     for key, (fn, tiles, swap, nstr) in RECIPES.items():
@@ -281,11 +291,11 @@ def make_all(colors, out_dir, asset_dir=None):
             continue
         img, h, r = fn(colors[key])
         if asset_dir:
-            cp = os.path.join(asset_dir, 'textures', key + '.png')
-            if os.path.exists(cp):
+            cp = _find(asset_dir, key)
+            if cp:
                 img = Image.open(cp).convert('RGB'); custom[key] = True
-                cn, co = cp[:-4] + '_n.png', cp[:-4] + '_orm.png'
-                if os.path.exists(cn) and os.path.exists(co):
+                cn, co = _find(asset_dir, key + '_n'), _find(asset_dir, key + '_orm')
+                if cn and co:
                     path = os.path.join(out_dir, key + '.png'); img.save(path)
                     out[key] = (path, tiles, swap, cn, co); maps[key] = (cn, co)
                     continue
