@@ -10,7 +10,7 @@
 // 캐릭터는 아직 없다. TODO(character-sheet).
 import * as THREE from 'three';
 import { GLTFLoader } from '../assets/vendor/three/addons/loaders/GLTFLoader.js';
-import { createBlackHole, BH } from './blackhole.js?v=0.11.0';   // 지하실 한가운데의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
+import { createBlackHole, BH } from './blackhole.js?v=0.11.1';   // 지하실 한가운데의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
 
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('scene');
@@ -171,10 +171,10 @@ const post = new THREE.ShaderMaterial({
       col += vec3(0.018, 0.01, 0.038) * (1.0 - lum) * smoothstep(0.0, 0.06, lum);   // 순검정(블랙홀 지평선)은 그대로 둔다
       col = mix(col, col * vec3(1.03, 1.0, 0.96), lum);
       col = mix(vec3(lum), col, 1.12);
-      col = mix(col, col * col * (3.0 - 2.0 * col), 0.3);                   // 살짝 S 자 대비
+      col = mix(col, col * col * (3.0 - 2.0 * col), 0.2);                   // 살짝 S 자 대비
       col = pow(max(col, 0.0), vec3(1.0 / 2.2));
       // 비네트 + 필름 그레인(화소마다 고정 — 깜빡이지 않는다)
-      col *= 1.0 - 0.2 * dot(q, q) * 0.7;
+      col *= 1.0 - 0.14 * dot(q, q) * 0.7;
       float g = hash(floor(gl_FragCoord.xy)) - 0.5;
       col += g * 0.022;
       if (fade > 0.0) {                                                     // 멍: 블랙홀이 아닌 곳은 어둠으로, 어둠 속에 별이 조금
@@ -211,16 +211,16 @@ function applyTheme() {
   // 낮: 연한 라벤더-파랑 하늘, 크림빛 지평선, 따뜻한 해. 밤: 먹빛 남색, 별·달, 차가운 달빛 — 창은 노랗게 빛난다
   u.zen.value.setStyle(dark ? '#0d1226' : '#7f9bd0', THREE.SRGBColorSpace);
   u.hor.value.setStyle(dark ? '#262c48' : '#eadfcb', THREE.SRGBColorSpace);
-  u.fogCol.value.setStyle(dark ? '#1a2038' : '#d9d2c8', THREE.SRGBColorSpace);
+  u.fogCol.value.setStyle(dark ? '#242c4c' : '#d9d2c8', THREE.SRGBColorSpace);
   u.sunCol.value.setStyle(dark ? '#334066' : '#ffe2b0', THREE.SRGBColorSpace);
   u.night.value = dark ? 1 : 0;
-  fogBase = dark ? 0.010 : 0.006; u.fogDensity.value = fogBase;
-  u.exposure.value = dark ? 1.1 : 1.0;
+  fogBase = dark ? 0.008 : 0.006; u.fogDensity.value = fogBase;
+  u.exposure.value = dark ? 1.5 : 1.2;   // 소유자 피드백(2026-11-24) '너무 어둡다' — 밤은 달빛이 충분히 비추게, 낮도 한 단 밝게
   u.cloud.value = dark ? 0.35 : 1.0;
   e.zen.value.copy(u.zen.value); e.hor.value.copy(u.hor.value); e.sunCol.value.copy(u.sunCol.value);
   e.gnd.value.setStyle(dark ? '#141412' : '#6f6a55', THREE.SRGBColorSpace);
-  hemiBase = dark ? 0.18 : 0.55; hemi.intensity = hemiBase;
-  sun.intensity = dark ? 0.35 : 3.0;
+  hemiBase = dark ? 0.75 : 0.8; hemi.intensity = hemiBase;
+  sun.intensity = dark ? 1.4 : 3.0;
   sun.color.set(dark ? 0x9fb3e6 : 0xfff0d8);
   hemi.color.set(dark ? 0x7f90b8 : 0xfff6e4);
   glowBoost = dark ? 3.2 : 1.6;

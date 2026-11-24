@@ -255,7 +255,7 @@ for side in 'SNEW':
             for uu in (u0 - 0.05, u1 + 0.05):
                 wbox(g, 'wood2', side, uu, (v0 + v1) / 2, 0.02, 0.1, v1 - v0, T + 0.1)
             wbox(g, 'wood2', side, (u0 + u1) / 2, v1 + 0.05, 0.02, u1 - u0 + 0.2, 0.1, T + 0.1)
-            wbox(g, 'paper', side, (u0 + u1) / 2, 1.55, 0.1, 0.42, 0.2, 0.03)   # 문패 (글자는 코드로)
+            wbox(gDoor, 'paper', side, (u0 + u1) / 2, 1.55, 0.1, 0.42, 0.2, 0.03)   # 문패 — 문짝 노드에 붙여 문과 함께 돈다 (벽에 두면 문이 열릴 때 공중에 남는다)
             cyl(gDoor, 'brass', wpos(side, u0 + 0.16, 1.0, 0.09), 0.04, 0.08, axis='Y' if side in 'SN' else 'X', seg=8)
 
 # 띠보 (층 사이) — 앞뒤 면에 붙여 같이 걷힌다
