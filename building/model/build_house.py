@@ -295,6 +295,15 @@ for side in 'SNEW':
         window(g, side, o[0], o[1], o[2], o[3])
     wbox(g, 'beam', side, 0, Z3 - 0.1, 0.06, L + 0.3, 0.2, T + 0.1)       # 처마 띠보
 
+# 베이크 전용 가림막(라이트맵, 2026-11-24): 8각 통나무·널빤지 틈으로 Cycles 빛이 새어 안쪽 벽에 줄무늬가 생기므로 벽 두께를 채우는 판을 두고,
+# 굽고 나면 내보내기 전에 지운다(glb 에 안 들어간다). 창·문 구멍은 그대로 둔다.
+gBake = group('bake_occluder', 1)
+for side in 'SNEW':
+    L = wlen(side)
+    rect_minus(gBake, 'plaster', side, (-L / 2, L / 2), (0.0, H1), 0.0, T * 0.8, OPEN1[side])
+    ops2 = [(a, b, Z2 + c, Z2 + d, k) for a, b, c, d, k in OPEN2[side]]
+    rect_minus(gBake, 'plaster', side, (-L / 2, L / 2), (Z2, Z2 + H2 + 0.2), 0.0, T * 0.8, ops2)
+
 # ---------------------------------------------------------------- 바닥판
 gf1 = group('f1_floor', 1)
 box(gf1, 'floor', (0, 0, 0.04), (W - 0.1, D - 0.1, 0.08))
@@ -474,6 +483,7 @@ for side, y in (('S', -D / 2 + 0.1), ('N', D / 2 - 0.1)):
         holes = [(win[2], win[3])] if win[0] - 0.02 < mid < win[1] + 0.02 else []
         for v0, v1 in subtract((Z3, top), holes):
             box(g, 'plank' if i % 3 else 'plank2', (mid, y, (v0 + v1) / 2), (x1 - x0, 0.08, v1 - v0))
+    prism(gBake, 'plaster', [(XA + 0.05, Z3), (XB - 0.05, Z3), (XB - 0.05, roof_z(XB - 0.05) - 0.08), (XR, ZK + RIDGE - 0.12), (XA + 0.05, roof_z(XA + 0.05) - 0.08)], y - 0.03, y + 0.03)   # 베이크 가림막
     # 안쪽 회벽 (오각형: 무릎벽 + 삼각형)
     yi = y + (0.06 if side == 'S' else -0.06)
     prism(g, 'plaster', [(XA + 0.2, Z3), (XB - 0.2, Z3), (XB - 0.2, roof_z(XB - 0.2) - 0.08),
@@ -844,7 +854,7 @@ from mathutils.bvhtree import BVHTree
 AO_EDGE = 0.45        # 이 길이보다 긴 변은 나눈다 (m)
 AO_RAYS = 40          # 정점당 광선 수
 AO_DIST = 1.3         # 이 거리 안의 물체만 그늘을 만든다 (m)
-AO_FLOOR = 0.5        # 가장 어두운 구석의 밝기 (0=검정)
+AO_FLOOR = 0.7        # 가장 어두운 구석의 밝기 (0=검정). 라이트맵이 구석 그늘을 맡으므로 약하게(0.5→0.7, 2026-11-24)
 AO_TINT = (0.82, 0.70, 0.60)   # 그늘 색 (따뜻한 갈색; 회색 그늘은 '3D 렌더' 느낌)
 
 def _subdivide_long(me):
@@ -1003,6 +1013,106 @@ texture_materials()
 project_uvs([o for o in bpy.data.objects if o.type == 'MESH'])
 
 out = sys.argv[-1] if sys.argv[-1].endswith('.glb') else 'house.glb'
+
+# ---------------------------------------------------------------- 라이트맵 굽기 (Cycles, 2026-11-24 리모델링 2)
+# 콘솔 게임처럼 조명을 미리 굽는다: 해가 벽에서 튕긴 따뜻한 반사광 + 하늘빛(직접+반사) 을 두 번째 UV('LM') 의 아틀라스 한 장에.
+# 해의 직접광·그림자는 사이트가 실시간으로 그린다(문이 움직이고, 밤에는 달로 바뀐다). 그래서 베이크 1 = 해만 켜고 반사광(INDIRECT)만,
+# 베이크 2 = 하늘만 켜고 직접+반사. 둘을 더해 <glb 이름>.lightmap.webp(sRGB, 값/LM_SCALE) 로 쓴다. 사이트는 lightMapIntensity=LM_SCALE.
+# 소품·나무·문은 아틀라스가 아까워 빼고(정점 AO 만), 큰 면(벽·바닥·지붕·땅·지하·데크·계단)만 넣는다. HOUSE_LM=0 이면 건너뛴다(빠른 확인용).
+LM_SIZE = int(os.environ.get('HOUSE_LM', '1024'))      # 2048 은 CPU 베이크가 몇 시간 걸린다
+LM_SAMPLES = int(os.environ.get('HOUSE_LM_SAMPLES', '20'))
+LM_SCALE = 2.0
+LM_SKIP = ('_props', 'f3_dome', 'outside', 'door', 'cellar_stairs', 'bake_occluder')
+
+def bake_lightmap(out_glb):
+    objs = [o for o in bpy.data.objects if o.type == 'MESH' and not any(k in o.name for k in LM_SKIP)]
+    # 1) 두 번째 UV: 객체마다 각도로 펼친 뒤(smart project) 전부 한 아틀라스에 채운다
+    for o in objs:
+        uv = o.data.uv_layers.new(name='LM')
+        o.data.uv_layers.active = uv
+    for o in bpy.data.objects:
+        o.select_set(o in objs)
+    bpy.context.view_layer.objects.active = objs[0]
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.0, correct_aspect=True, scale_to_bounds=False)
+    bpy.ops.uv.average_islands_scale()                                    # 객체마다 0~1 로 맞춰진 섬을 실제 크기 비율로 (큰 벽이 큰 섬)
+    bpy.ops.uv.pack_islands(rotate=True, margin_method='ADD', margin=0.003, shape_method='AABB')   # 섬이 수천 개라 비율 여백은 아틀라스를 다 먹는다 → 절대 여백(베이크 여백보다 넓게, 섬끼리 번지지 않게)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    # 2) 모든 재질에 아틀라스 이미지 노드를 활성으로 두면 Cycles 가 거기에 굽는다
+    img_sun = bpy.data.images.new('LM_sun', LM_SIZE, LM_SIZE, float_buffer=True)
+    img_sky = bpy.data.images.new('LM_sky', LM_SIZE, LM_SIZE, float_buffer=True)
+    nodes_ = []
+    for m in bpy.data.materials:
+        if not m.use_nodes:
+            continue
+        n = m.node_tree.nodes.new('ShaderNodeTexImage'); n.name = 'LM_BAKE'
+        uvn = m.node_tree.nodes.new('ShaderNodeUVMap'); uvn.uv_map = 'LM'
+        m.node_tree.links.new(uvn.outputs['UV'], n.inputs['Vector'])
+        m.node_tree.nodes.active = n
+        nodes_.append(n)
+    sc = bpy.context.scene
+    sc.render.engine = 'CYCLES'
+    sc.cycles.device = 'CPU'
+    sc.cycles.samples = LM_SAMPLES
+    sc.cycles.use_denoising = False
+    sc.cycles.max_bounces = 4; sc.cycles.diffuse_bounces = 4
+    sc.render.bake.use_selected_to_active = False
+    sc.render.bake.margin = max(2, LM_SIZE // 512)   # 섬 간격(0.003×크기)의 절반 이하
+    sc.render.bake.use_clear = True
+    sc.render.bake.use_pass_color = False
+    # 해 (building.js 의 sun.position (-6, 14, 9) → 모델 좌표 (-6, -9, 14))
+    sun_data = bpy.data.lights.new('LM_SUN', 'SUN'); sun_data.energy = 3.0; sun_data.angle = math.radians(8.0)   # 각지름을 키워 창으로 든 해 그림자를 부드럽게(실내 벽의 날카로운 얼룩 방지)
+    sun_data.color = (1.0, 0.94, 0.85)
+    sun_ob = bpy.data.objects.new('LM_SUN', sun_data); sc.collection.objects.link(sun_ob)
+    sun_ob.rotation_euler = (-Vector((-6, -9, 14))).normalized().to_track_quat('-Z', 'Y').to_euler()
+    world = bpy.data.worlds.new('LM_WORLD') if sc.world is None else sc.world
+    sc.world = world; world.use_nodes = True
+    bg = world.node_tree.nodes.get('Background')
+    bg.inputs['Color'].default_value = (0.72, 0.76, 0.86, 1)
+    for o in bpy.data.objects:
+        o.select_set(o in objs)
+    bpy.context.view_layer.objects.active = objs[0]
+    # 베이크 1: 해만, 반사광만
+    bg.inputs['Strength'].default_value = 0.0; sun_ob.hide_render = False
+    for n in nodes_: n.image = img_sun
+    sc.render.bake.use_pass_direct = False; sc.render.bake.use_pass_indirect = True
+    bpy.ops.object.bake(type='DIFFUSE')
+    # 베이크 2: 하늘만, 직접+반사
+    bg.inputs['Strength'].default_value = 0.85; sun_ob.hide_render = True
+    for n in nodes_: n.image = img_sky
+    sc.render.bake.use_pass_direct = True; sc.render.bake.use_pass_indirect = True
+    bpy.ops.object.bake(type='DIFFUSE')
+    # 3) 더해서 8비트 sRGB WebP 로
+    import numpy as np
+    a = np.array(img_sun.pixels[:], dtype=np.float32).reshape(LM_SIZE, LM_SIZE, 4)
+    b = np.array(img_sky.pixels[:], dtype=np.float32).reshape(LM_SIZE, LM_SIZE, 4)
+    L = (a[..., :3] * 1.0 + b[..., :3] * 1.0) / LM_SCALE
+    cov = np.maximum(a[..., 3:4], b[..., 3:4])
+    L = np.where(cov > 0, L, 0.5)                                   # 섬 밖은 중간값
+    L = np.clip(L, 0, 1) ** (1 / 2.2)
+    from PIL import Image as _I, ImageFilter as _F
+    im = _I.fromarray((L * 255).astype(np.uint8)).transpose(_I.FLIP_TOP_BOTTOM)   # Blender 는 아래가 0 행, glTF/three 는 위가 0 행
+    im = im.filter(_F.GaussianBlur(0.8))                            # 베이크 노이즈를 살짝 누른다
+    lm_path = out_glb[:-4] + '.lightmap.webp'
+    im.save(lm_path, quality=88, method=6)
+    # 베이크용 노드·이미지는 내보내기 전에 지운다 (glb 에 들어가면 안 된다)
+    for m in bpy.data.materials:
+        if not m.use_nodes:
+            continue
+        for n in list(m.node_tree.nodes):
+            if n.name.startswith('LM_BAKE') or (n.type == 'UVMAP' and n.uv_map == 'LM'):
+                m.node_tree.nodes.remove(n)
+    bpy.data.objects.remove(sun_ob); bpy.data.images.remove(img_sun); bpy.data.images.remove(img_sky)
+    for o in objs:
+        o.data.uv_layers.active = o.data.uv_layers['UVMap']
+    print('LIGHTMAP', lm_path, LM_SIZE, 'objects', len(objs), 'samples', LM_SAMPLES)
+
+if LM_SIZE > 0:
+    bake_lightmap(out)
+occ = bpy.data.objects.get('bake_occluder')          # 가림막은 베이크에만 쓰고 내보내지 않는다
+if occ:
+    bpy.data.objects.remove(occ)
 bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', export_extras=True, export_apply=True,
                           export_yup=True, export_materials='EXPORT', export_normals=False,   # 면이 평평해 법선은 GLTFLoader 가 계산해도 같다 (glb 25% 절약)
                           use_selection=False, export_vertex_color='ACTIVE', export_all_vertex_colors=False,

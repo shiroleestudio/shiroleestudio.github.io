@@ -8,7 +8,7 @@ AI 초안(나노바나나 등)은 여기 넣지 않는다 — 저장소 밖 프�
 파일 이름은 `build_house.py` 의 재질 키와 같다(확장자는 png·jpg·webp 아무거나). 색 지도 `<키>.jpg` 만 넣어도 되고(법선·거칠기는 코드가 만든 것을 씀),
 `<키>_n`(접선 공간 법선, OpenGL 규약 +Y 위)·`<키>_orm`(R=AO 또는 1, G=거칠기, B=금속성) 까지 넣으면 그것을 쓴다.
 권장 1024×1024(sRGB), 법선·거칠기는 선형. 넣은 뒤 `python building/model/build_house.py building/house.glb` 로 다시 만든다.
-지금 들어 있는 것은 ambientCG 의 CC0 사진 텍스처 6벌(`textures/SOURCES.md`) — 통나무·지붕널은 아직 코드 생성.
+지금 들어 있는 것은 ambientCG 의 CC0 사진 텍스처 7벌(`textures/SOURCES.md`) — 지붕널은 아직 코드 생성.
 
 | 키 | 쓰이는 곳 | 타일/m |
 |---|---|---|
