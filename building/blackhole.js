@@ -19,9 +19,20 @@ float hash(vec3 p){ p = fract(p * 0.3183099 + .1); p *= 17.0; return fract(p.x *
 float noise(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3. - 2. * f);
   return mix(mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x), mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
              mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x), mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z); }
-float fbm(vec3 p){ float a = 0., w = .5; for (int i = 0; i < 6; i++) { a += w * noise(p); p *= 2.07; w *= .5; } return a; }   // 6 옥타브(고해상도용, 2026-11-24)
-vec3 diskColor(float T){ vec3 c0 = vec3(1., .36, .08), c1 = vec3(1., .70, .38), c2 = vec3(1., .95, .86);   // T 1 = 안쪽(가장 뜨거움)
-  return mix(mix(c0, c1, smoothstep(0., .5, T)), c2, smoothstep(.5, 1., T)); }
+float fbm(vec3 p){ float a = 0., w = .5; for (int i = 0; i < 5; i++) { a += w * noise(p); p *= 2.07; w *= .5; } return a; }
+// 원반 색(반지름 기준, 인터스텔라 가르강튀아 참고 이미지, 두호 2026-11-24): 안쪽 흰 크림 → 노랑 → 주황 → 바깥은 어두운 적갈색으로 꺼진다
+vec3 diskColor(float rc){ float x = (rc - 2.3) / 11.2;
+  vec3 c0 = vec3(1., .97, .90), c1 = vec3(1., .72, .36), c2 = vec3(.62, .22, .07), c3 = vec3(.10, .03, .01);
+  return mix(mix(mix(c0, c1, smoothstep(0., .22, x)), c2, smoothstep(.22, .62, x)), c3, smoothstep(.62, 1., x)); }
+const float rin = 2.3, rout = 13.5;
+// 원반 밀도: 매끈한 반지름 분포 × 나선으로 길게 늘인 실(각도에 반지름을 더해 비틀어 나선이 된다, MisterPrada/singularity 의 회전 위상 발상만 참고) — 가는 동심원 줄무늬는 넣지 않는다
+float diskDens(float rc, float A){
+  float prof = smoothstep(rin, rin + .4, rc) * (1. - smoothstep(rout - 3., rout, rc));
+  float S = A + rc * 0.55;                                                   // 나선 위상
+  float fil = fbm(vec3(rc * 0.8, S * 1.0, 0.7));
+  float fil2 = noise(vec3(rc * 2.6, S * 2.4, 2.0));
+  return prof * (0.55 + 0.6 * fil) * (0.85 + 0.3 * fil2);                   // 대비를 낮게 — 참고 이미지는 실이 많아도 전체가 매끈하게 빛난다
+}
 void main(){
   vec3 rd = normalize(rayMat * vec3(v.x * tanV * aspect, v.y * tanV, -1.));
   // 경계 공(반지름 BOUND)과 만나는 데서 시작한다. 비껴가면 투명
@@ -31,9 +42,8 @@ void main(){
   vec3 p = camPos + rd * t0, vel = rd;
   vec3 h = cross(p, vel); float h2 = dot(h, h);
   vec3 col = vec3(0); float trans = 1.;
-  const float rin = 2.3, rout = 13.5;
   bool hit = false;
-  for (int i = 0; i < 360; i++) {                                           // 걸음을 촘촘히(0.08→0.05 r) 하고 횟수를 늘려 광자 고리·렌즈 가장자리가 매끈하게
+  for (int i = 0; i < 360; i++) {                                           // 걸음을 촘촘히(0.05 r) 하고 횟수를 늘려 광자 고리·렌즈 가장자리가 매끈하게
     float r = length(p);
     if (r < 1.02) { hit = true; break; }
     if (r > BOUND && dot(p, vel) > 0.) break;
@@ -41,36 +51,36 @@ void main(){
     vec3 a = -1.5 * h2 * p / pow(r, 5.);
     vec3 vh = vel + a * dt * .5; vec3 pn = p + vh * dt; float rn = length(pn);
     vec3 an = -1.5 * h2 * pn / pow(rn, 5.); vec3 vn = vh + an * dt * .5;
+    float rcv = length(p.xz);
+    // 원반 위아래로 번지는 얇은 빛안개(원반에 두께감, 참고 이미지의 고리 둘레 번짐) — 평면 가까이에서만 적분한다
+    if (abs(p.y) < 1.2 && rcv > rin && rcv < rout + 1.5) {
+      float hz = exp(-abs(p.y) * 5.0) * smoothstep(rin, rin + .6, rcv) * (1. - smoothstep(rout - 4., rout + 1.5, rcv));
+      col += trans * diskColor(rcv) * hz * dt * (0.02 + 0.14 * pow(rin / rcv, 1.6));
+    }
     if (p.y * pn.y < 0.) {                                                   // 원반 평면을 지난다
       float f = p.y / (p.y - pn.y); vec3 c = mix(p, pn, f); float rc = length(c.xz);
       if (rc > rin && rc < rout) {
         float ang = atan(c.z, c.x);
         float om = 2.2 * pow(rc, -1.5);
         float A = ang + om * t * 2.2;                                        // 차등 회전(안쪽이 빠름)
-        float fil = fbm(vec3(rc * 3.2, A * 1.6, 0.7));
-        float fil2 = noise(vec3(rc * 14.0, A * 3.0, 2.0));
-        float fil3 = noise(vec3(rc * 40.0, A * 1.2, 5.0));
-        float fil4 = noise(vec3(rc * 110.0, A * 6.0, 9.0));                   // 가는 실 (고해상도에서만 보인다)
-        float dens = smoothstep(rin, rin + .35, rc) * pow(1. - smoothstep(rout - 5.5, rout, rc), 1.6);
-        dens *= pow(0.35 + 1.0 * fil, 2.6) * (0.7 + 0.6 * fil2) * (0.8 + 0.4 * fil3) * (0.88 + 0.24 * fil4);
-        float T = clamp(1.08 * pow(rin / rc, 0.9), 0., 1.);
+        float dens = diskDens(rc, A);
         // 도플러 빔 δ³ (gargantua-cinema 의 식): 원 궤도 속도 β = 1/√(2(r−1)), δ = 1/(γ(1−βμ)), μ = 속도 방향 · 카메라 쪽. 다가오는 쪽이 훨씬 밝다
         vec3 vd = normalize(vec3(-sin(ang), 0., cos(ang)));
         float beta = min(0.99, inversesqrt(2.0 * max(rc - 1.0, 0.05)));
         float gam = inversesqrt(1.0 - beta * beta);
         float mu = dot(vd, -normalize(vn));
         float del = 1.0 / (gam * (1.0 - beta * mu));
-        float dop = clamp(del * del * del, 0.08, 6.0) * 0.55;
+        float dop = clamp(del * del * del, 0.12, 5.0) * 0.6;
         float grav = sqrt(max(0., 1. - 1.0 / rc));                          // 중력 적색편이
-        vec3 e = diskColor(T) * dens * dop * grav * (0.35 + 1.9 * pow(rin / rc, 1.7));
-        float alpha = clamp(dens * 0.75, 0., 1.);
-        col += trans * e * alpha; trans *= (1. - alpha * 0.9);
+        vec3 e = diskColor(rc) * dens * dop * grav * (0.3 + 2.6 * pow(rin / rc, 1.6));
+        float alpha = clamp(dens * 0.8, 0., 1.);
+        col += trans * e * alpha; trans *= (1. - alpha * 0.92);
         if (trans < 0.02) break;
       }
     }
     p = pn; vel = vn;
   }
-  float cov = hit ? 1. : clamp(1. - trans, 0., 1.);                          // 덮는 정도: 지평선은 1(검정), 원반은 불투명도, 비껴가면 0
+  float cov = hit ? 1. : clamp(1. - trans + min(0.4, dot(col, vec3(0.3))), 0., 1.);   // 덮는 정도: 지평선은 1(검정), 원반은 불투명도(+빛안개 조금), 비껴가면 0
   o = vec4(col, cov);                                                        // 미리 곱한 알파
 }`;
 
@@ -92,16 +102,17 @@ uniform sampler2D base, glow, glow2; uniform vec2 res;
 void main(){ vec2 uv = gl_FragCoord.xy / res;
   vec4 b = texture(base, uv);
   float m = mix(1.0, 0.1, step(0.999, b.a));                                               // 지평선(a=1) 안으로는 빛무리가 번지지 않는다 — 그림자는 검어야 한다
-  vec3 g = (texture(glow, uv).rgb * 0.8 + texture(glow2, uv).rgb * 0.5) * m;
+  vec3 g = (texture(glow, uv).rgb * 0.8 + texture(glow2, uv).rgb * 0.7) * m;
   vec3 c = (b.rgb + g) * 1.15;
   vec3 x = c; c = clamp((x * (2.51 * x + .03)) / (x * (2.43 * x + .59) + .14), 0., 1.);   // ACES
   float a = clamp(b.a + dot(g, vec3(0.5)), 0., 1.);                                        // 빛무리도 조금 가린다
   o = vec4(c, a); }`;
 
 export const BH = {
-  CENTER: new THREE.Vector3(0, -1.45, 0),       // 세계 좌표. 지하실 한가운데, 바닥(−2.6) 위 1.15 m — 눈높이(1.45) 바로 아래라 살짝 내려다본다
-  SCALE: 0.148,                                 // m / 셰이더 단위. 원반 바깥 반지름 13.5 단위 = 2.0 m (두호: 지하실을 거의 꽉 채우게, 더 크게)
-  RADIUS: 16 * 0.148,                           // 경계 공 반지름(m) 2.37 — 벽(±2.2)을 조금 넘는다. 벽 뒤 부분은 깊이 검사로 가려진다
+  CENTER: new THREE.Vector3(0, -1.6, 0),        // 세계 좌표. 지하실 한가운데, 바닥(−2.6) 위 1.0 m — 눈높이(1.45)에서 0.45 m 내려다본다(참고 이미지의 낮은 앙각)
+  SCALE: 0.11,                                  // m / 셰이더 단위. 원반 바깥 반지름 13.5 단위 = 1.5 m(지름 3 m). 2026-11-24 두호 참고 이미지(인터스텔라)처럼 보이려면
+                                                // 보는 사람이 원반 '밖'에 있어야 해서 2.0 m 반지름(방을 꽉 채움, 서 있는 자리가 원반 안)에서 줄였다
+  RADIUS: 16 * 0.11,                            // 경계 공 반지름(m) 1.76
 };
 
 export function createBlackHole(renderer) {
@@ -142,7 +153,7 @@ export function createBlackHole(renderer) {
       const prev = renderer.getRenderTarget();
       pass(sceneMat, T.base);
       const bu = blurMat.uniforms;
-      bu.src.value = T.base.texture; bu.dir.value.set(1, 0); bu.thr.value = 0.6; pass(blurMat, T.a);
+      bu.src.value = T.base.texture; bu.dir.value.set(1, 0); bu.thr.value = 0.45; pass(blurMat, T.a);
       bu.src.value = T.a.texture; bu.dir.value.set(0, 1); bu.thr.value = 0; pass(blurMat, T.b);
       bu.src.value = T.b.texture; bu.dir.value.set(1, 0); pass(blurMat, T.c);
       bu.src.value = T.c.texture; bu.dir.value.set(0, 1); pass(blurMat, T.d);

@@ -178,9 +178,12 @@ const post = new THREE.ShaderMaterial({
       float g = hash(floor(gl_FragCoord.xy)) - 0.5;
       col += g * 0.022;
       if (fade > 0.0) {                                                     // 멍: 블랙홀이 아닌 곳은 어둠으로, 어둠 속에 별이 조금
-        float cov = texture2D(tCover, vUv).a;
+        vec4 tc = texture2D(tCover, vUv); float cov = tc.a;
         float st = step(0.9985, hash(floor(gl_FragCoord.xy / 1.5) + 11.0)) * (0.3 + 0.7 * hash(floor(gl_FragCoord.xy / 1.5) + 5.0));
-        col = mix(col, vec3(st * 0.35, st * 0.33, st * 0.4), fade * (1.0 - cov));
+        // 반투명한 원반·빛안개 뒤로 방이 비치지 않게, 블랙홀 버퍼(미리 곱한 색)만 다시 톤을 눌러 별 위에 얹는다(2026-11-24)
+        vec3 x = tc.rgb * 1.15; vec3 bhc = clamp((x * (2.51 * x + .03)) / (x * (2.43 * x + .59) + .14), 0., 1.);
+        vec3 dark = vec3(st * 0.35, st * 0.33, st * 0.4) * (1.0 - cov) + bhc + (texture2D(tBloom, vUv).rgb * 0.3 + texture2D(tBloom2, vUv).rgb * 0.2) * 0.6;
+        col = mix(col, dark, fade);
       }
       gl_FragColor = vec4(col, 1.0);
     }`,
@@ -342,7 +345,7 @@ stage.addEventListener('pointermove', (e) => {
     touched();
     const dx = locked ? e.movementX : e.clientX - lastX, dy = locked ? e.movementY : e.clientY - lastY;
     lastX = e.clientX; lastY = e.clientY; moved += Math.abs(dx) + Math.abs(dy);
-    const k = e.pointerType === 'mouse' ? (locked ? 0.0022 : 0.004) : 0.0022;   // 손가락·잠긴 마우스는 둔하게 (멀미)
+    const k = e.pointerType === 'mouse' ? (locked ? 0.0034 : 0.0056) : 0.0032;   // 시선 감도(두호 2026-11-24 '좀 더 높여줘': 0.0022/0.004 → 약 1.5배)
     wYaw -= dx * k; wPitch = Math.min(0.9, Math.max(-0.9, wPitch - dy * k * 0.7)); dirty = true;
   }
 });
@@ -498,7 +501,7 @@ function blocked(x, z, y) {
   const inside = Math.abs(x) < 2.7 && Math.abs(z) < 2.2;
   for (const r of OBST[lv]) if (inRect(x, z, r)) return true;
   if (lv === 'B') {
-    if (Math.hypot(x, z) < 1.1) return true;                                                    // 블랙홀 한가운데(지평선·안쪽 원반)로는 못 들어간다. 바깥 원반 가장자리는 머리 아래로 지난다
+    if (Math.hypot(x, z) < 0.8) return true;                                                    // 블랙홀 한가운데(지평선·광자 고리, 반지름 0.8 m)로는 못 들어간다. 원반(반지름 1.5 m)은 머리 아래로 지난다
     if (inside) return false;
     if (x > TRX0 && x < TRX1 && z > -1.7 && z < 2.0) return false;                        // 구덩이
     if (x >= -3.06 && x <= -2.7 && z > CDOOR[0] && z < CDOOR[1]) return false;              // 문
