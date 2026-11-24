@@ -10,7 +10,7 @@
 // 캐릭터는 아직 없다. TODO(character-sheet).
 import * as THREE from 'three';
 import { GLTFLoader } from '../assets/vendor/three/addons/loaders/GLTFLoader.js';
-import { createBlackHole, BH } from './blackhole.js?v=0.11.1';   // 지하실 한가운데의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
+import { createBlackHole, BH } from './blackhole.js?v=0.12.0';   // 지하실 한가운데의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
 
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('scene');
@@ -219,8 +219,10 @@ function applyTheme() {
   u.cloud.value = dark ? 0.35 : 1.0;
   e.zen.value.copy(u.zen.value); e.hor.value.copy(u.hor.value); e.sunCol.value.copy(u.sunCol.value);
   e.gnd.value.setStyle(dark ? '#141412' : '#6f6a55', THREE.SRGBColorSpace);
-  hemiBase = dark ? 0.75 : 0.8; hemi.intensity = hemiBase;
-  sun.intensity = dark ? 1.4 : 3.0;
+  hemiBase = dark ? 0.6 : 0.42; hemi.intensity = hemiBase;      // 하늘빛의 큰 몫은 라이트맵이 맡는다(큰 면). 소품은 이 값만 받는다
+  lmBoost = dark ? 0.25 : 0.75; for (const m of lmMats) m.lightMapIntensity = LM_SCALE * lmBoost;   // 큰 면은 해 직접광(실시간) + 라이트맵(하늘·반사광)
+  for (const m of glassMats) { m.emissiveIntensity = dark ? 2.6 : 0.0; m.opacity = dark ? 0.7 : 0.42; m.envMapIntensity = dark ? 0.6 : 1.8; }
+  sun.intensity = dark ? 1.3 : 2.6;
   sun.color.set(dark ? 0x9fb3e6 : 0xfff0d8);
   hemi.color.set(dark ? 0x7f90b8 : 0xfff6e4);
   glowBoost = dark ? 3.2 : 1.6;
@@ -236,15 +238,27 @@ let dirty = true;
 let hemiBase = 0.55;         // 테마가 정한 하늘빛 세기 (지하실에서는 0.25 배로 어둡게)
 let fogBase = 0.011;          // 테마가 정한 안개 농도 (지하실에서는 0)
 let glowBoost = 1.6;          // 불 켜진 창·전구의 밝기 배율(HDR — 블룸이 번진다). 밤에 더 밝다
-const glowMats = [];
+const glowMats = [], glassMats = [];
+let lmBoost = 1.0;            // 라이트맵 세기 배율(낮 1, 밤 0.3)
 
+// 라이트맵(build_house.py 가 Cycles 로 구운 해 반사광 + 하늘빛, 두 번째 UV). 값은 /LM_SCALE 로 저장돼 있어 세기를 LM_SCALE 로 되돌린다.
+// 밤에는 달빛이라 치고 약하게·푸르게. 소품·나무는 라이트맵이 없어(uv1 없음) 정점 AO 만 쓴다.
+const LM_SCALE = 2.0;
+const lightMap = new THREE.TextureLoader().load(new URL('house.lightmap.webp', import.meta.url).href);
+lightMap.colorSpace = THREE.SRGBColorSpace; lightMap.flipY = false; lightMap.anisotropy = 4;
+lightMap.channel = 1;   // glTF TEXCOORD_1(uv1) 로 샘플링 — 기본 0 이면 색 텍스처 좌표로 아틀라스가 벽에 타일링돼 얼룩처럼 보인다
+const lmMats = [];
 const matCache = new Map();
-function materialize(m, vc) {
+function materialize(m, vc, lm) {
   // 모델의 PBR 재질(MeshStandardMaterial: 색·법선·거칠기 지도)을 그대로 쓰되, 구워 둔 구석 그늘(COLOR_0)을 곱하고 결이 뭉개지지 않게 한다
-  const key = m.name + (vc ? '+vc' : '');
+  const key = m.name + (vc ? '+vc' : '') + (lm ? '+lm' : '');
   if (matCache.has(key)) return matCache.get(key);
   let out;
-  if (m.name.startsWith('glow')) {                  // 불 켜진 창·전구: 조명 없이 밝게 (HDR → 블룸)
+  if (m.name === 'glow') {                          // 창: 유리 — 낮에는 하늘이 비치고 안이 들여다보이며, 밤에는 따뜻하게 빛난다(발광 → 블룸)
+    out = new THREE.MeshStandardMaterial({ color: 0xdfe8ee, roughness: 0.06, metalness: 0.0, envMapIntensity: 1.8, transparent: true, opacity: 0.42,
+      emissive: m.color.clone(), emissiveIntensity: 0, side: THREE.DoubleSide, depthWrite: false });
+    out.userData.base = m.color.clone(); glassMats.push(out);
+  } else if (m.name.startsWith('glow')) {           // 전구·줄 전등: 조명 없이 밝게 (HDR → 블룸)
     out = new THREE.MeshBasicMaterial({ color: m.color.clone().multiplyScalar(glowBoost) });
     out.userData.base = m.color.clone(); glowMats.push(out);
   } else {
@@ -253,6 +267,7 @@ function materialize(m, vc) {
     out.envMapIntensity = 0.6;
     for (const t of [out.map, out.normalMap, out.roughnessMap, out.metalnessMap]) if (t) t.anisotropy = renderer.capabilities.getMaxAnisotropy();
     if (out.normalMap) out.normalScale.set(0.9, 0.9);
+    if (lm) { out.lightMap = lightMap; out.lightMapIntensity = LM_SCALE * lmBoost; lmMats.push(out); }
   }
   matCache.set(key, out);
   return out;
@@ -268,8 +283,9 @@ new GLTFLoader().load(new URL('house.glb', import.meta.url).href, (gltf) => {
   house.traverse((o) => {
     if (o.isMesh) {
       if (!o.geometry.getAttribute('normal')) o.geometry.computeVertexNormals();   // glb 에 법선을 안 넣는다 (면이 평평해 계산값이 같다)
-      const vc = !!o.geometry.getAttribute('color');
-      o.material = Array.isArray(o.material) ? o.material.map((m) => materialize(m, vc)) : materialize(o.material, vc);
+      const vc = !!o.geometry.getAttribute('color'), lm = !!o.geometry.getAttribute('uv1');
+      o.material = Array.isArray(o.material) ? o.material.map((m) => materialize(m, vc, lm)) : materialize(o.material, vc, lm);
+      if (o.material.transparent) { o.renderOrder = 5; o.castShadow = false; }   // 유리창은 해를 가리지 않는다
       o.castShadow = o.receiveShadow = true;
     }
     if (o.name.startsWith('anchor_')) anchors[o.name.slice(7)] = o;
@@ -343,6 +359,23 @@ stage.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
 const wp = new THREE.Vector3();
 
 // ---- 크기 ----
+// 블랙홀 버퍼 해상도(두호 2026-11-24: 블랙홀만이라도 고해상도로). PC 는 화면 화소 그대로(폭 1600 상한), 터치 기기는 0.75(폭 1200 상한).
+// 지하실에서 프레임이 느리면(34 ms 넘게) 한 단씩 줄이고, 빠르면(14 ms 아래) 다시 올린다 — 아이폰 15·갤럭시 S23 급이 기준.
+let bhQ = 1.0, bhAcc = 0, bhN = 0, bhLock = false;   // bhLock: 검토 스크립트가 해상도를 고정할 때
+function bhResize() {
+  const w = stage.clientWidth, h = stage.clientHeight, pr = renderer.getPixelRatio();
+  const touch = matchMedia('(hover: none)').matches;
+  const base = touch ? Math.min(0.75, 1200 / (w * pr)) : Math.min(1.0, 1600 / (w * pr));
+  bh.setSize(w * pr, h * pr, Math.max(0.3, base * bhQ));
+}
+function bhGovern(dt) {
+  if (bhLock) return;
+  bhAcc += dt; bhN++;
+  if (bhN < 45) return;
+  const avg = bhAcc / bhN; bhAcc = 0; bhN = 0;
+  if (avg > 0.034 && bhQ > 0.42) { bhQ = Math.max(0.4, bhQ * 0.8); bhResize(); }
+  else if (avg < 0.014 && bhQ < 1) { bhQ = Math.min(1, bhQ * 1.15); bhResize(); }
+}
 function resize() {
   const w = stage.clientWidth, h = stage.clientHeight;
   if (!w || !h) return;
@@ -351,7 +384,7 @@ function resize() {
   rtColor.setSize(w * pr, h * pr);
   bloomRT.a.setSize((w * pr) >> 2, (h * pr) >> 2); bloomRT.b.setSize((w * pr) >> 2, (h * pr) >> 2);
   bloomRT.c.setSize((w * pr) >> 3, (h * pr) >> 3); bloomRT.d.setSize((w * pr) >> 3, (h * pr) >> 3);
-  bh.setSize(w * pr, h * pr, Math.min(0.5, 720 / (w * pr)));                      // 블랙홀 버퍼: 화면의 1/2, 폭 720 화소 상한
+  bhResize();
   post.uniforms.texel.value.set(1 / (w * pr), 1 / (h * pr));
   camera.aspect = w / h;
   camera.fov = camera.aspect < 1 ? 85 : 62;                                        // 세로 화면은 시야를 넓게
@@ -381,7 +414,7 @@ function frame() {
     bhLight.visible = inCellar; sun.visible = !inCellar;                       // 지하는 해가 안 든다. 하늘빛도 줄여 블랙홀이 돋보이게
     hemi.intensity = inCellar ? hemiBase * 0.25 : hemiBase;
     if (inCellar) bhLight.intensity = 16 + 3.0 * Math.sin(now * 0.0021) + 1.5 * Math.sin(now * 0.0057 + 1.0) + 0.8 * Math.sin(now * 0.013);   // 모닥불처럼
-    if (bhOn) bh.render(camera, now / 1000);
+    if (bhOn) { bh.render(camera, now / 1000); bhGovern(dt); }
     // 멍: 지하실에서 조작이 없으면 방이 사라진다 (블랙홀 공이 안 보이면 지우지 않는다 — 깜깜해지기만 하니까)
     const idle = (now - lastInput) / 1000;
     fade = bhOn ? Math.min(1, Math.max(0, (idle - IDLE.start) / IDLE.dur)) : 0;
@@ -555,7 +588,7 @@ addEventListener('keydown', (e) => {
 addEventListener('keyup', (e) => { if (KEYMAP[e.code]) keys.delete(KEYMAP[e.code]); });
 addEventListener('blur', () => keys.clear());
 // 검토 스크립트(model/check.js)가 쓰는 손잡이. 사이트 기능이 아니다
-window.__house = { get player() { return player; }, get walking() { return true; }, get near() { return nearRoom; }, get blackhole() { return bhOn; }, get fade() { return fade; }, idle(start, dur) { IDLE.start = start; IDLE.dur = dur; }, teleport(x, y, z, yaw) { player.set(x, y, z); if (yaw !== undefined) wYaw = yaw; touched(); dirty = true; }, canStand, surfaceAt, look(yaw, pitch) { wYaw = yaw; wPitch = pitch; dirty = true; } };
+window.__house = { get player() { return player; }, get walking() { return true; }, get near() { return nearRoom; }, get blackhole() { return bhOn; }, get bhQ() { return bhQ; }, set bhQ(q) { bhQ = q; bhLock = true; bhResize(); }, get fade() { return fade; }, idle(start, dur) { IDLE.start = start; IDLE.dur = dur; }, teleport(x, y, z, yaw) { player.set(x, y, z); if (yaw !== undefined) wYaw = yaw; touched(); dirty = true; }, canStand, surfaceAt, look(yaw, pitch) { wYaw = yaw; wPitch = pitch; dirty = true; } };
 
 // 이름표(메뉴): 가까운 방 하나만, 그 자리 위에 뜬다
 function placeLabels() {

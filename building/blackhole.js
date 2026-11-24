@@ -19,7 +19,7 @@ float hash(vec3 p){ p = fract(p * 0.3183099 + .1); p *= 17.0; return fract(p.x *
 float noise(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3. - 2. * f);
   return mix(mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x), mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
              mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x), mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z); }
-float fbm(vec3 p){ float a = 0., w = .5; for (int i = 0; i < 5; i++) { a += w * noise(p); p *= 2.07; w *= .5; } return a; }
+float fbm(vec3 p){ float a = 0., w = .5; for (int i = 0; i < 6; i++) { a += w * noise(p); p *= 2.07; w *= .5; } return a; }   // 6 옥타브(고해상도용, 2026-11-24)
 vec3 diskColor(float T){ vec3 c0 = vec3(1., .36, .08), c1 = vec3(1., .70, .38), c2 = vec3(1., .95, .86);   // T 1 = 안쪽(가장 뜨거움)
   return mix(mix(c0, c1, smoothstep(0., .5, T)), c2, smoothstep(.5, 1., T)); }
 void main(){
@@ -33,11 +33,11 @@ void main(){
   vec3 col = vec3(0); float trans = 1.;
   const float rin = 2.3, rout = 13.5;
   bool hit = false;
-  for (int i = 0; i < 220; i++) {
+  for (int i = 0; i < 360; i++) {                                           // 걸음을 촘촘히(0.08→0.05 r) 하고 횟수를 늘려 광자 고리·렌즈 가장자리가 매끈하게
     float r = length(p);
     if (r < 1.02) { hit = true; break; }
     if (r > BOUND && dot(p, vel) > 0.) break;
-    float dt = clamp(r * 0.08, 0.02, 0.7);
+    float dt = clamp(r * 0.05, 0.015, 0.5);
     vec3 a = -1.5 * h2 * p / pow(r, 5.);
     vec3 vh = vel + a * dt * .5; vec3 pn = p + vh * dt; float rn = length(pn);
     vec3 an = -1.5 * h2 * pn / pow(rn, 5.); vec3 vn = vh + an * dt * .5;
@@ -50,8 +50,9 @@ void main(){
         float fil = fbm(vec3(rc * 3.2, A * 1.6, 0.7));
         float fil2 = noise(vec3(rc * 14.0, A * 3.0, 2.0));
         float fil3 = noise(vec3(rc * 40.0, A * 1.2, 5.0));
+        float fil4 = noise(vec3(rc * 110.0, A * 6.0, 9.0));                   // 가는 실 (고해상도에서만 보인다)
         float dens = smoothstep(rin, rin + .35, rc) * pow(1. - smoothstep(rout - 5.5, rout, rc), 1.6);
-        dens *= pow(0.35 + 1.0 * fil, 2.6) * (0.7 + 0.6 * fil2) * (0.8 + 0.4 * fil3);
+        dens *= pow(0.35 + 1.0 * fil, 2.6) * (0.7 + 0.6 * fil2) * (0.8 + 0.4 * fil3) * (0.88 + 0.24 * fil4);
         float T = clamp(1.08 * pow(rin / rc, 0.9), 0., 1.);
         // 도플러 빔 δ³ (gargantua-cinema 의 식): 원 궤도 속도 β = 1/√(2(r−1)), δ = 1/(γ(1−βμ)), μ = 속도 방향 · 카메라 쪽. 다가오는 쪽이 훨씬 밝다
         vec3 vd = normalize(vec3(-sin(ang), 0., cos(ang)));
