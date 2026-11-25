@@ -115,8 +115,8 @@ export const BH = {
   // 실제 거리 d(m) 를 셰이더 거리 g(d) 단위로 옮긴다. 벽가(3.2 m) 에서는 16 단위(원반 밖, 인터스텔라 구도), 가장 가까운 0.7 m(충돌 원) 에서는
   // 6.5 단위 — 원반 안쪽까지 들어가지만 앙각을 과장(TILT)해 위에서 내려다보므로 지평선이 화면을 크게 채운다.
   NEAR_M: 0.7, FAR_M: 3.2, NEAR_U: 6.5, FAR_U: 16.0,
-  TILT_FAR: 2.0, TILT_NEAR: 4.5,                // 앙각 과장(실제 앙각의 탄젠트에 곱한다): 벽가 2배, 가장 가까이 4.5배 — 다가갈수록 '작아져서 사건의 지평선 위를 거니는' 구도(두호 2026-11-25).
-                                                // 시선은 되돌려 블랙홀이 실제 자리에 보인다
+  TILT_FAR: 2.0, TILT_NEAR: 0.3,                // 앙각 배율(실제 앙각의 탄젠트에 곱한다): 벽가 2배(살짝 내려다보는 인터스텔라 구도) → 가장 가까이 0.3배(눈이 원반 높이 가까이 내려가
+                                                // 원반 위를 걷는 느낌, 지평선이 눈앞에 벽처럼 선다 — 두호 2026-11-25 "위에서 보는 게 아니고 강착원반에서 걷는 느낌"). 시선은 되돌려 블랙홀이 실제 자리에 보인다
   tilt(d) { const t = Math.min(1, Math.max(0, (d - this.NEAR_M) / (this.FAR_M - this.NEAR_M))); return this.TILT_NEAR + (this.TILT_FAR - this.TILT_NEAR) * t; },
   dist(d) { const t = Math.min(1, Math.max(0, (d - this.NEAR_M) / (this.FAR_M - this.NEAR_M))); return this.NEAR_U + (this.FAR_U - this.NEAR_U) * t; },
 };
