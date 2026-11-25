@@ -113,12 +113,12 @@ export const BH = {
   RADIUS: 2.1,                                  // 경계 공 반지름(m). 방 안(벽 ±2.2) 에 들어가야 한다 — 벽이 공의 뒷면을 가리면 블랙홀이 사라진다
   // 거리 압축(2026-11-25 두호 "현실성을 좀 무시해도 돼. 가까이 가려 할수록 진짜 블랙홀 사이즈처럼 커 보이는 거지"):
   // 실제 거리 d(m) 를 셰이더 거리 g(d) 단위로 옮긴다. 벽가(3.2 m) 에서는 16 단위(원반 밖, 인터스텔라 구도), 가장 가까운 0.7 m(충돌 원) 에서는
-  // 6.5 단위 — 원반 안쪽까지 들어가지만 앙각을 과장(TILT)해 위에서 내려다보므로 지평선이 화면을 크게 채운다.
-  NEAR_M: 0.7, FAR_M: 3.2, NEAR_U: 6.5, FAR_U: 16.0,
+  // 3.0 단위 — 원반 안쪽까지 들어가지만 앙각을 과장(TILT)해 위에서 내려다보므로 지평선이 화면을 크게 채운다.
+  NEAR_M: 0.7, FAR_M: 3.2, NEAR_U: 3.0, FAR_U: 16.0,   // 2026-11-25 두호 '10배는 더 작아져도' → 가장 가까이 6.5 → 3.0 단위(광자 구 1.5 의 두 배 거리, 원반 안쪽 가장자리 2.3 바로 밖)
   TILT_FAR: 2.0, TILT_NEAR: 0.3,                // 앙각 배율(실제 앙각의 탄젠트에 곱한다): 벽가 2배(살짝 내려다보는 인터스텔라 구도) → 가장 가까이 0.3배(눈이 원반 높이 가까이 내려가
                                                 // 원반 위를 걷는 느낌, 지평선이 눈앞에 벽처럼 선다 — 두호 2026-11-25 "위에서 보는 게 아니고 강착원반에서 걷는 느낌"). 시선은 되돌려 블랙홀이 실제 자리에 보인다
   tilt(d) { const t = Math.min(1, Math.max(0, (d - this.NEAR_M) / (this.FAR_M - this.NEAR_M))); return this.TILT_NEAR + (this.TILT_FAR - this.TILT_NEAR) * t; },
-  dist(d) { const t = Math.min(1, Math.max(0, (d - this.NEAR_M) / (this.FAR_M - this.NEAR_M))); return this.NEAR_U + (this.FAR_U - this.NEAR_U) * t; },
+  dist(d) { const t = Math.min(1, Math.max(0, (d - this.NEAR_M) / (this.FAR_M - this.NEAR_M))); return this.NEAR_U * Math.pow(this.FAR_U / this.NEAR_U, t); },   // 지수 보간: 가까울수록 급히 커진다
 };
 
 export function createBlackHole(renderer) {
