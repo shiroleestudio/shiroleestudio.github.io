@@ -112,10 +112,12 @@ export const BH = {
   CENTER: new THREE.Vector3(0, -3.1, 0),        // 세계 좌표. 지하실(바닥 −4.2, 천장 높이 4.2 m) 한가운데, 바닥 위 1.1 m — 눈높이(1.45)에서 살짝 내려다본다
   RADIUS: 2.1,                                  // 경계 공 반지름(m). 방 안(벽 ±2.2) 에 들어가야 한다 — 벽이 공의 뒷면을 가리면 블랙홀이 사라진다
   // 거리 압축(2026-11-25 두호 "현실성을 좀 무시해도 돼. 가까이 가려 할수록 진짜 블랙홀 사이즈처럼 커 보이는 거지"):
-  // 실제 거리 d(m) 를 셰이더 거리 g(d) 단위로 옮긴다. 벽가(3.2 m) 에서는 16 단위(원반 밖, 인터스텔라 구도), 가장 가까운 1 m(충돌 원) 에서는
+  // 실제 거리 d(m) 를 셰이더 거리 g(d) 단위로 옮긴다. 벽가(3.2 m) 에서는 16 단위(원반 밖, 인터스텔라 구도), 가장 가까운 0.7 m(충돌 원) 에서는
   // 6.5 단위 — 원반 안쪽까지 들어가지만 앙각을 과장(TILT)해 위에서 내려다보므로 지평선이 화면을 크게 채운다.
-  NEAR_M: 1.0, FAR_M: 3.2, NEAR_U: 6.5, FAR_U: 16.0,
-  TILT: 2.5,                                    // 앙각 과장: 가까이 갈수록 원반을 위에서 내려다보는 구도가 되게(실제 앙각의 탄젠트에 곱한다). 시선은 되돌려 블랙홀이 실제 자리에 보인다
+  NEAR_M: 0.7, FAR_M: 3.2, NEAR_U: 6.5, FAR_U: 16.0,
+  TILT_FAR: 2.0, TILT_NEAR: 4.5,                // 앙각 과장(실제 앙각의 탄젠트에 곱한다): 벽가 2배, 가장 가까이 4.5배 — 다가갈수록 '작아져서 사건의 지평선 위를 거니는' 구도(두호 2026-11-25).
+                                                // 시선은 되돌려 블랙홀이 실제 자리에 보인다
+  tilt(d) { const t = Math.min(1, Math.max(0, (d - this.NEAR_M) / (this.FAR_M - this.NEAR_M))); return this.TILT_NEAR + (this.TILT_FAR - this.TILT_NEAR) * t; },
   dist(d) { const t = Math.min(1, Math.max(0, (d - this.NEAR_M) / (this.FAR_M - this.NEAR_M))); return this.NEAR_U + (this.FAR_U - this.NEAR_U) * t; },
 };
 
@@ -154,7 +156,7 @@ export function createBlackHole(renderer) {
       u.tanV.value = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2); u.aspect.value = camera.aspect;
       // 거리 압축 + 앙각 과장: 실제 카메라 위치 → 가상 위치. 시선 기준은 '블랙홀 중심이 실제 자리에 보이도록' 돌린다
       real.copy(camera.position).sub(BH.CENTER); const d = real.length();
-      virt.set(real.x, real.y * BH.TILT, real.z).normalize().multiplyScalar(BH.dist(d));
+      virt.set(real.x, real.y * BH.tilt(d), real.z).normalize().multiplyScalar(BH.dist(d));
       u.camPos.value.copy(virt);
       dirA.copy(real).multiplyScalar(-1).normalize(); dirB.copy(virt).multiplyScalar(-1).normalize();
       qFix.setFromUnitVectors(dirA, dirB); mFix.makeRotationFromQuaternion(qFix);

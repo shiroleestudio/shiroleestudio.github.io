@@ -501,7 +501,7 @@ function blocked(x, z, y) {
   const inside = Math.abs(x) < 2.7 && Math.abs(z) < 2.2;
   for (const r of OBST[lv]) if (inRect(x, z, r)) return true;
   if (lv === 'B') {
-    if (Math.hypot(x, z) < 1.0) return true;                                                    // 블랙홀 한가운데(지평선·광자 고리, 반지름 1.0 m)로는 못 들어간다. 원반(반지름 1.9 m)은 머리 아래로 지난다
+    if (Math.hypot(x, z) < 0.7) return true;                                                    // 블랙홀 한가운데(반지름 0.7 m)로는 못 들어간다 — 거기가 지평선을 바로 위에서 내려다보는 가장 가까운 자리
     if (inside) return false;
     if (x > TRX0 && x < TRX1 && z > -2.5 && z < 2.6) return false;                        // 구덩이
     if (x >= -3.06 && x <= -2.7 && z > CDOOR[0] && z < CDOOR[1]) return false;              // 문
