@@ -21,16 +21,16 @@ float noise(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3. - 2. * f);
              mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x), mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z); }
 float fbm(vec3 p){ float a = 0., w = .5; for (int i = 0; i < 5; i++) { a += w * noise(p); p *= 2.07; w *= .5; } return a; }
 // 원반 색(반지름 기준, 인터스텔라 가르강튀아 참고 이미지, 두호 2026-11-24): 안쪽 흰 크림 → 노랑 → 주황 → 바깥은 어두운 적갈색으로 꺼진다
-vec3 diskColor(float rc){ float x = (rc - 2.3) / 11.2;
+vec3 diskColor(float rc){ float x = (rc - 2.3) / 7.7;
   vec3 c0 = vec3(1., .97, .90), c1 = vec3(1., .72, .36), c2 = vec3(.62, .22, .07), c3 = vec3(.10, .03, .01);
   return mix(mix(mix(c0, c1, smoothstep(0., .22, x)), c2, smoothstep(.22, .62, x)), c3, smoothstep(.62, 1., x)); }
-const float rin = 2.3, rout = 13.5;
+const float rin = 2.3, rout = 10.0;                                       // 원반 바깥을 13.5→10 으로: 그림자(2.6) 대비 원반이 참고 이미지 비율(약 4배)
 // 원반 밀도: 매끈한 반지름 분포 × 나선으로 길게 늘인 실(각도에 반지름을 더해 비틀어 나선이 된다, MisterPrada/singularity 의 회전 위상 발상만 참고) — 가는 동심원 줄무늬는 넣지 않는다
 float diskDens(float rc, float A){
-  float prof = smoothstep(rin, rin + .4, rc) * (1. - smoothstep(rout - 3., rout, rc));
+  float prof = smoothstep(rin, rin + .4, rc) * (1. - smoothstep(rout - 2.5, rout, rc));
   float S = A + rc * 0.55;                                                   // 나선 위상
-  float fil = fbm(vec3(rc * 0.8, S * 1.0, 0.7));
-  float fil2 = noise(vec3(rc * 2.6, S * 2.4, 2.0));
+  float fil = fbm(vec3(rc * 0.8, 2.2 * cos(S), 2.2 * sin(S)));                // 각도를 원 위의 점으로 넣어 둘레가 이어진다(atan 의 ±π 이음새 없음)
+  float fil2 = noise(vec3(rc * 2.6, 5.0 * cos(2. * S), 5.0 * sin(2. * S)));
   return prof * (0.55 + 0.6 * fil) * (0.85 + 0.3 * fil2);                   // 대비를 낮게 — 참고 이미지는 실이 많아도 전체가 매끈하게 빛난다
 }
 void main(){
@@ -54,7 +54,7 @@ void main(){
     float rcv = length(p.xz);
     // 원반 위아래로 번지는 얇은 빛안개(원반에 두께감, 참고 이미지의 고리 둘레 번짐) — 평면 가까이에서만 적분한다
     if (abs(p.y) < 1.2 && rcv > rin && rcv < rout + 1.5) {
-      float hz = exp(-abs(p.y) * 5.0) * smoothstep(rin, rin + .6, rcv) * (1. - smoothstep(rout - 4., rout + 1.5, rcv));
+      float hz = exp(-abs(p.y) * 5.0) * smoothstep(rin, rin + .6, rcv) * (1. - smoothstep(rout - 3., rout + 1.5, rcv));
       col += trans * diskColor(rcv) * hz * dt * (0.02 + 0.14 * pow(rin / rcv, 1.6));
     }
     if (p.y * pn.y < 0.) {                                                   // 원반 평면을 지난다
@@ -109,10 +109,14 @@ void main(){ vec2 uv = gl_FragCoord.xy / res;
   o = vec4(c, a); }`;
 
 export const BH = {
-  CENTER: new THREE.Vector3(0, -1.6, 0),        // 세계 좌표. 지하실 한가운데, 바닥(−2.6) 위 1.0 m — 눈높이(1.45)에서 0.45 m 내려다본다(참고 이미지의 낮은 앙각)
-  SCALE: 0.11,                                  // m / 셰이더 단위. 원반 바깥 반지름 13.5 단위 = 1.5 m(지름 3 m). 2026-11-24 두호 참고 이미지(인터스텔라)처럼 보이려면
-                                                // 보는 사람이 원반 '밖'에 있어야 해서 2.0 m 반지름(방을 꽉 채움, 서 있는 자리가 원반 안)에서 줄였다
-  RADIUS: 16 * 0.11,                            // 경계 공 반지름(m) 1.76
+  CENTER: new THREE.Vector3(0, -3.1, 0),        // 세계 좌표. 지하실(바닥 −4.2, 천장 높이 4.2 m) 한가운데, 바닥 위 1.1 m — 눈높이(1.45)에서 살짝 내려다본다
+  RADIUS: 2.1,                                  // 경계 공 반지름(m). 방 안(벽 ±2.2) 에 들어가야 한다 — 벽이 공의 뒷면을 가리면 블랙홀이 사라진다
+  // 거리 압축(2026-11-25 두호 "현실성을 좀 무시해도 돼. 가까이 가려 할수록 진짜 블랙홀 사이즈처럼 커 보이는 거지"):
+  // 실제 거리 d(m) 를 셰이더 거리 g(d) 단위로 옮긴다. 벽가(3.2 m) 에서는 16 단위(원반 밖, 인터스텔라 구도), 가장 가까운 1 m(충돌 원) 에서는
+  // 6.5 단위 — 원반 안쪽까지 들어가지만 앙각을 과장(TILT)해 위에서 내려다보므로 지평선이 화면을 크게 채운다.
+  NEAR_M: 1.0, FAR_M: 3.2, NEAR_U: 6.5, FAR_U: 16.0,
+  TILT: 2.5,                                    // 앙각 과장: 가까이 갈수록 원반을 위에서 내려다보는 구도가 되게(실제 앙각의 탄젠트에 곱한다). 시선은 되돌려 블랙홀이 실제 자리에 보인다
+  dist(d) { const t = Math.min(1, Math.max(0, (d - this.NEAR_M) / (this.FAR_M - this.NEAR_M))); return this.NEAR_U + (this.FAR_U - this.NEAR_U) * t; },
 };
 
 export function createBlackHole(renderer) {
@@ -128,7 +132,7 @@ export function createBlackHole(renderer) {
   const qcam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   const rt = (w, h) => new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, depthBuffer: false, magFilter: THREE.LinearFilter, minFilter: THREE.LinearFilter });
   let T = null;
-  const camRot = new THREE.Matrix3(), tmp = new THREE.Vector3();
+  const real = new THREE.Vector3(), virt = new THREE.Vector3(), dirA = new THREE.Vector3(), dirB = new THREE.Vector3(), qFix = new THREE.Quaternion(), mFix = new THREE.Matrix4(), m4 = new THREE.Matrix4();
   function pass(mat, target) { quad.material = mat; renderer.setRenderTarget(target); renderer.render(qscene, qcam); }
   return {
     material: windowMat,
@@ -148,8 +152,13 @@ export function createBlackHole(renderer) {
       const u = sceneMat.uniforms;
       u.t.value = time;
       u.tanV.value = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2); u.aspect.value = camera.aspect;
-      tmp.copy(camera.position).sub(BH.CENTER).divideScalar(BH.SCALE); u.camPos.value.copy(tmp);
-      u.rayMat.value.setFromMatrix4(camera.matrixWorld);
+      // 거리 압축 + 앙각 과장: 실제 카메라 위치 → 가상 위치. 시선 기준은 '블랙홀 중심이 실제 자리에 보이도록' 돌린다
+      real.copy(camera.position).sub(BH.CENTER); const d = real.length();
+      virt.set(real.x, real.y * BH.TILT, real.z).normalize().multiplyScalar(BH.dist(d));
+      u.camPos.value.copy(virt);
+      dirA.copy(real).multiplyScalar(-1).normalize(); dirB.copy(virt).multiplyScalar(-1).normalize();
+      qFix.setFromUnitVectors(dirA, dirB); mFix.makeRotationFromQuaternion(qFix);
+      m4.multiplyMatrices(mFix, camera.matrixWorld); u.rayMat.value.setFromMatrix4(m4);
       const prev = renderer.getRenderTarget();
       pass(sceneMat, T.base);
       const bu = blurMat.uniforms;

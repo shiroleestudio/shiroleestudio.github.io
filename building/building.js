@@ -10,7 +10,7 @@
 // 캐릭터는 아직 없다. TODO(character-sheet).
 import * as THREE from 'three';
 import { GLTFLoader } from '../assets/vendor/three/addons/loaders/GLTFLoader.js';
-import { createBlackHole, BH } from './blackhole.js?v=0.12.0';   // 지하실 한가운데의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
+import { createBlackHole, BH } from './blackhole.js?v=0.13.0';   // 지하실 한가운데의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
 
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('scene');
@@ -461,8 +461,8 @@ const R12 = { z0: 0.6, z1: -2.28, y0: 0.08, y1: 2.9 };          // 1층→2층: 
 const R23 = { z0: 0.6, z1: -2.1, y0: 2.9, y1: 5.6 };            // 2층→루프탑
 const HOLE12 = [-2.9, -1.95, -2.28, -0.25], HOLE23 = [-2.9, -1.95, -2.1, -0.3];   // [x0,x1,z0,z1] 위층 바닥 구멍
 const TRX0 = -3.87, TRX1 = -3.06;                               // 바깥 돌계단 구덩이 x
-const RC = { z0: -1.7, z1: 1.1, y0: 0, y1: -2.6 };              // 북(땅) 에서 남으로 내려간다
-const BZ = -2.6, CDOOR = [1.1, 1.9];                            // 지하실 바닥, 서쪽 벽 문(z)
+const RC = { z0: -2.5, z1: 1.5, y0: 0, y1: -4.2 };              // 북(땅) 에서 남으로 내려간다 (18단, 4.2 m)
+const BZ = -4.2, CDOOR = [1.5, 2.3];                            // 지하실 바닥(2026-11-25 두호: 천장을 높여 4.2 m), 서쪽 벽 문(z)
 const inRect = (x, z, r) => x > r[0] && x < r[1] && z > r[2] && z < r[3];
 const rampY = (r, z) => r.y0 + (r.y1 - r.y0) * (z - r.z0) / (r.z1 - r.z0);
 const onRamp = (r, x0, x1, x, z) => x > x0 && x < x1 && z > Math.min(r.z0, r.z1) - 0.02 && z < Math.max(r.z0, r.z1) + 0.02;
@@ -472,7 +472,7 @@ function surfaceAt(x, z, y) {
   const inHouse = Math.abs(x) < 2.87 && Math.abs(z) < 2.37;
   const inLot = Math.abs(x) <= 8.2 && Math.abs(z) <= 6.7;
   const inFoot = Math.abs(x) < 3.06 && Math.abs(z) < 2.56;
-  const inTrench = x > TRX0 && x < TRX1 && z > -1.7 && z < 2.0;
+  const inTrench = x > TRX0 && x < TRX1 && z > -2.5 && z < 2.6;
   if (inLot && !inFoot && !inTrench) c.push(0);                                      // 마당
   if (inHouse) { c.push(0.08); if (!inRect(x, z, HOLE12)) c.push(2.9); }               // 1층 · 2층
   if (x > 0.3 && x < 1.3 && z >= 2.37 && z < 2.62) c.push(0.08);                      // 현관 문턱(벽 두께 구간). 이게 없으면 문이 열려도 문턱에서 막힌다 (두호 2026-11-23 보고)
@@ -487,7 +487,7 @@ function surfaceAt(x, z, y) {
   return best;
 }
 // 벽·가구. 층은 발높이로 가른다
-const LEVEL = (y) => (y < -1.3 ? 'B' : y < 1.5 ? 1 : y < 4.3 ? 2 : 3);
+const LEVEL = (y) => (y < -1.0 ? 'B' : y < 1.5 ? 1 : y < 4.3 ? 2 : 3);
 const OBST = {      // [x0,x1,z0,z1] 가구 (모델 좌표에서 z 부호를 바꾼 것)
   1: [[0.9, 2.6, -1.35, -0.75], [2.05, 2.65, -0.8, 0.4], [2.1, 2.7, 1.55, 2.05], [-0.05, 0.25, 3.35, 3.65], [1.35, 1.65, 3.35, 3.65]],   // 카운터 ㄱ자, 난로, 현관 포치 기둥 둘(모델 PX0·PX1·PY)
   2: [[0.8, 2.7, -2.2, -1.4], [0.85, 1.95, 0.8, 1.4], [-1.9, -1.1, 0.0, 0.8], [2.15, 2.65, -0.05, 0.45], [-1.95, -1.8, -1.6, -0.25]],   // 작업대, 책상, 이젤, 상자, 계단 구멍 난간
@@ -501,9 +501,9 @@ function blocked(x, z, y) {
   const inside = Math.abs(x) < 2.7 && Math.abs(z) < 2.2;
   for (const r of OBST[lv]) if (inRect(x, z, r)) return true;
   if (lv === 'B') {
-    if (Math.hypot(x, z) < 0.8) return true;                                                    // 블랙홀 한가운데(지평선·광자 고리, 반지름 0.8 m)로는 못 들어간다. 원반(반지름 1.5 m)은 머리 아래로 지난다
+    if (Math.hypot(x, z) < 1.0) return true;                                                    // 블랙홀 한가운데(지평선·광자 고리, 반지름 1.0 m)로는 못 들어간다. 원반(반지름 1.9 m)은 머리 아래로 지난다
     if (inside) return false;
-    if (x > TRX0 && x < TRX1 && z > -1.7 && z < 2.0) return false;                        // 구덩이
+    if (x > TRX0 && x < TRX1 && z > -2.5 && z < 2.6) return false;                        // 구덩이
     if (x >= -3.06 && x <= -2.7 && z > CDOOR[0] && z < CDOOR[1]) return false;              // 문
     return true;
   }
