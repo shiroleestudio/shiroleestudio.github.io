@@ -349,11 +349,11 @@ RAIL_LATER = [((SX1 + 0.12, HOLE23[2]), (SX1 + 0.12, 1.6)), ((SX0, HOLE23[2] - 0
 LOT_W, LOT_D = 18.0, 15.0
 g0 = group('ground', 0)
 # 지하실(2026-11-23): 집 발자국 아래 돌방. 바깥 서쪽 벽 옆 돌계단 구덩이(TRENCH)로 내려가 서쪽 벽 문으로 든다 (찻집 안을 비우지 않아도 된다).
-BZ = -2.6                                   # 지하실 바닥 z
+BZ = -4.2                                   # 지하실 바닥 z (2026-11-25 두호 '지하실 높이를 높이고' — 2.6 → 4.2 m 높이 돌방, 블랙홀이 꽉 차게)
 HOLE_HOUSE = (-W / 2 - 0.06, W / 2 + 0.06, -D / 2 - 0.06, D / 2 + 0.06)
 TRX0, TRX1 = -3.95, -W / 2 - 0.06           # 구덩이 x (집 벽 바로 바깥)
-TRY0, TRY1 = -2.0, 1.7                      # 구덩이 y: 북쪽 끝(1.7, 땅높이)에서 남쪽으로 내려간다
-CELLAR_DOOR = (-1.9, -1.1)                  # 서쪽 벽 문 (y)
+TRY0, TRY1 = -2.6, 2.5                      # 구덩이 y: 북쪽 끝(2.5, 땅높이)에서 남쪽으로 내려간다 (4.2 m 를 18단, 약 46°)
+CELLAR_DOOR = (-2.3, -1.5)                  # 서쪽 벽 문 (y)
 slab(g0, 'grass', (0, 0, -0.1), (LOT_W, LOT_D, 0.2), [HOLE_HOUSE, (TRX0, TRX1, TRY0, TRY1)])
 gB = group('basement', -1)
 BIX, BIY = W / 2 - 0.3, D / 2 - 0.3         # 안쪽 반 치수
@@ -363,9 +363,9 @@ for sgn in (-1, 1):                                                             
 box(gB, 'stone', (BIX + 0.18, 0, (BZ - 0.03) / 2), (0.36, D + 0.12, -BZ - 0.03))                 # 동벽
 for y0, y1 in subtract((-D / 2 - 0.06, D / 2 + 0.06), [CELLAR_DOOR]):                           # 서벽 (문 구멍)
     box(gB, 'stone', (-BIX - 0.18, (y0 + y1) / 2, (BZ - 0.03) / 2), (0.36, y1 - y0, -BZ - 0.03))
-box(gB, 'stone', (-BIX - 0.18, sum(CELLAR_DOOR) / 2, -0.35), (0.36, CELLAR_DOOR[1] - CELLAR_DOOR[0], 0.6))   # 문 위 인방
+box(gB, 'stone', (-BIX - 0.18, sum(CELLAR_DOOR) / 2, (BZ + 2.2 - 0.05) / 2), (0.36, CELLAR_DOOR[1] - CELLAR_DOOR[0], -0.05 - (BZ + 2.2)))   # 문 위 벽(문 높이 2.2 m)
 box(gB, 'plank2', (2.0, -1.5, BZ + 0.25), (0.6, 0.6, 0.5))                                       # 상자 하나
-# 블랙홀멍(두호 2026-11-23): 방 한가운데 캠프파이어처럼 블랙홀이 뜬다 — 사이트가 셰이더로 그린다(blackhole.js). 방을 거의 채우는 크기(원반 반지름 1.6 m)라
+# 블랙홀멍(두호 2026-11-23): 방 한가운데 캠프파이어처럼 블랙홀이 뜬다 — 사이트가 셰이더로 그린다(blackhole.js). 방을 거의 채우는 크기(원반 반지름 1.9 m, 2026-11-25)라
 # 기둥·등은 없고, 긴 의자 둘은 남·북 벽에 붙여 가운데를 본다. 자리는 building.js OBST.B 와 같다.
 for yb in (-1.95, 1.95):
     box(gB, 'plank2', (0, yb, BZ + 0.42), (1.8, 0.42, 0.06))
@@ -374,7 +374,7 @@ for yb in (-1.95, 1.95):
 anchor('cellar', (0.0, 1.2, BZ + 1.4))
 # 구덩이: 돌계단(북→남으로 내려감) + 바닥 + 서쪽·남쪽 옹벽(땅 위 0.5 m 난간)
 gC0 = group('cellar_stairs', 0)
-stairs(gC0, ['stone', 'stone2'], TRX0 + 0.08, TRX1, TRY1, CELLAR_DOOR[1] + 0.0, 0.0, BZ, 12, base=BZ - 0.1)   # 역방향: 북(땅)→남(바닥)
+stairs(gC0, ['stone', 'stone2'], TRX0 + 0.08, TRX1, TRY1, CELLAR_DOOR[1] + 0.0, 0.0, BZ, 18, base=BZ - 0.1)   # 역방향: 북(땅)→남(바닥)
 box(gC0, 'stone2', ((TRX0 + 0.08 + TRX1) / 2, (TRY0 + CELLAR_DOOR[1]) / 2, BZ - 0.05), (TRX1 - TRX0 - 0.08, CELLAR_DOOR[1] - TRY0, 0.1))
 box(gC0, 'stone', (TRX0 - 0.06, (TRY0 + TRY1) / 2, (BZ - 0.1 + 0.5) / 2), (0.2, TRY1 - TRY0 + 0.3, 0.6 - BZ))
 box(gC0, 'stone', ((TRX0 + TRX1) / 2 - 0.06, TRY0 - 0.08, (BZ - 0.1 + 0.5) / 2), (TRX1 - TRX0 + 0.3, 0.2, 0.6 - BZ))
