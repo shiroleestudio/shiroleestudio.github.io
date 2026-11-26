@@ -59,6 +59,12 @@ srv.listen(0, async () => {
         await page.evaluate(([x, y, z, yaw]) => { window.__house.teleport(x, y, z, yaw); window.__house.look(yaw, 0.02); }, [x, y, z, yaw]);
         await page.waitForTimeout(400);
         await shot(page, path.join(outDir, `spot-${SPOTS.indexOf(SPOTS.find((s) => s[0] === label)) + 1}-${label}.png`));
+        if (label === '계단 중간') {
+          // 걸어서 올라가기: 1층 계단 아래에서 0.1 m 씩 옮기며(북 → 꼭대기에서 동쪽 2층 → 남 → 위 계단 → 북 → 동쪽 데크) 발높이가 2층(2.9)·루프탑(5.6)에 닿는지 (두호 2026-11-26 '계단이 그냥 통과돼')
+          const top = await page.evaluate(() => { const H = window.__house; const PATH = [[-2.4, 1.0], [-2.4, -2.1], [-1.0, -2.1], [-1.0, 1.0], [-2.4, 1.0], [-2.4, -2.0], [-1.7, -2.0]]; let [x, z] = PATH[0]; let y = 0.08; H.teleport(x, y, z); const ys = []; for (let k = 1; k < PATH.length; k++) { const [tx, tz] = PATH[k]; const n = Math.ceil(Math.hypot(tx - x, tz - z) / 0.1); for (let i = 1; i <= n; i++) { const nx = x + (tx - x) * i / n, nz = z + (tz - z) * i / n; if (!H.canStand(nx, nz)) return { stop: [nx.toFixed(2), nz.toFixed(2)], y: y.toFixed(2), ys }; y = H.surfaceAt(nx, nz, y); H.teleport(nx, y, nz); } x = tx; z = tz; ys.push(+y.toFixed(2)); } return { ys }; });
+          if (top.stop || Math.abs(top.ys[2] - 2.9) > 0.05 || Math.abs(top.ys[6] - 5.6) > 0.05) bad(`걸어서 계단을 못 오름 ${JSON.stringify(top)}`);
+          await page.evaluate(([x, y, z, yaw]) => { window.__house.teleport(x, y, z, yaw); window.__house.look(yaw, 0.02); }, [x, y, z, yaw]);
+        }
         // 블랙홀은 창을 볼 때만 그려야 한다 (지하실 자리는 남쪽 벽을 보고, 블랙홀멍 자리는 북쪽 창을 본다)
         const bhOn = await page.evaluate(() => window.__house.blackhole);
         if (label === '블랙홀멍' && !bhOn) bad('블랙홀을 보는데 그려지지 않음');

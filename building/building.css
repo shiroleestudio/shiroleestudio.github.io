@@ -28,10 +28,12 @@
 .pad-look .touch::before{width:18px;height:1px;margin:0 0 0 -9px}
 .pad-look .touch::after{width:1px;height:18px;margin:-9px 0 0 0}
 .pad-look.on .touch{border-color:var(--ink)}
-.stage.nowebgl ~ .pad,.stage.failed ~ .pad{display:none}
-@media(hover:none) and (orientation:portrait){
-  .home-page .stage{flex:0 0 auto;aspect-ratio:16/10;min-height:0;height:auto}
-  .home-page .pad{display:grid;grid-template-columns:148px minmax(0,1fr);gap:16px;align-items:stretch;width:min(900px,100% - 32px);max-height:260px;min-height:170px;margin:auto;padding:0}
+.home-page .stage.nowebgl ~ .pad,.home-page .stage.failed ~ .pad{display:none}
+/* 터치 기기는 building.js 가 <html class="touch"> 를 단다(hover 미디어 쿼리는 S펜 폰에서 틀린다) */
+@media(orientation:portrait){
+  html.touch .home-page .stage{flex:0 0 auto;aspect-ratio:16/10;min-height:0;height:auto}
+  html.touch .home-page .pad{display:grid}
+  .home-page .pad{grid-template-columns:148px minmax(0,1fr);gap:16px;align-items:stretch;width:min(900px,100% - 32px);max-height:260px;min-height:170px;margin:auto;padding:0}
   .home-page .pad-stick{display:flex;flex-direction:column;justify-content:center}
   .home-page .pad-look{display:flex;flex-direction:column;min-height:0}
   .home-page .pad-look .touch{flex:1;height:auto}
