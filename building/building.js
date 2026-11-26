@@ -10,7 +10,7 @@
 // 캐릭터는 아직 없다. TODO(character-sheet).
 import * as THREE from 'three';
 import { GLTFLoader } from '../assets/vendor/three/addons/loaders/GLTFLoader.js';
-import { createBlackHole, BH } from './blackhole.js?v=0.14.0';   // 지하실 한가운데의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
+import { createBlackHole, BH } from './blackhole.js?v=0.14.1';   // 지하실 한가운데의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
 
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('scene');
@@ -400,7 +400,11 @@ if (padStick && padLook) {
   padLook.addEventListener('pointercancel', (e) => lookRelease(e, false));
   for (const el of [padStick, padLook]) el.addEventListener('contextmenu', (e) => e.preventDefault());   // 길게 눌러도 메뉴가 뜨지 않게
 }
-const padQuery = matchMedia('(hover: none) and (orientation: portrait)');
+// 터치 기기 판정은 maxTouchPoints 로(S펜 폰처럼 hover:hover 를 내는 기기가 있어 hover 만으로는 패드가 안 뜬다 — 두호 2026-11-26). <html class="touch"> 를 CSS 가 본다
+const TOUCH = navigator.maxTouchPoints > 0 || matchMedia('(any-pointer: coarse)').matches;
+if (TOUCH) document.documentElement.classList.add('touch');
+const portraitQuery = matchMedia('(orientation: portrait)');
+const padShown = () => TOUCH && portraitQuery.matches;
 // iOS Safari: 무대 위 두 손가락은 페이지 확대가 아니다
 stage.addEventListener('gesturestart', (e) => e.preventDefault());
 stage.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
@@ -484,7 +488,7 @@ function frame() {
 // 울타리 문 앞에서 시작해 마당을 걷고, 현관으로 1층 찻집에 들어간다. 찻집 서쪽 벽 계단으로 2층, 그 위 계단으로 루프탑 데크. 집 서쪽 바깥 돌계단으로 지하실.
 // 다락(놀이방·천문대)은 데크에서 서쪽 지붕면의 도머 입구(z 0.05~0.95)로 걸어 들어간다(2026-11-24). 지붕이 낮은 양옆(|x-1.2| > 0.98)은 못 간다.
 // 키보드 WASD·방향키. 터치는 모바일 FPS 식: 왼쪽 반을 누른 자리에 조이스틱이 떠서 밀면 걷고, 오른쪽 반을 끌면 둘러본다(두 손가락 동시 가능).
-// 세로 폰(hover:none + portrait)은 무대를 16:10 으로 줄이고 그 아래 가상 게임패드(#pad: 왼쪽 고정 스틱, 오른쪽 터치패드)를 둔다(두호 2026-11-26). 무대 위 터치도 그대로 된다.
+// 세로 폰(터치 기기 + portrait)은 무대를 16:10 으로 줄이고 그 아래 가상 게임패드(#pad: 왼쪽 고정 스틱, 오른쪽 터치패드)를 둔다(두호 2026-11-26). 무대 위 터치도 그대로 된다.
 // 마우스는 클릭하면 잠겨 움직이는 대로 둘러본다(Esc 로 풀림). 잠기지 않으면 끌어서 돌린다.
 // three 좌표: 모델의 남쪽(정문)이 +z, 위가 +y. 집 발자국 ±3 × ±2.5, 현관은 x 0.35~1.25 의 남쪽 벽.
 // 발높이·충돌 수치는 model/build_house.py 의 계단(ST12·ST23·HOLE12·HOLE23)·지하(BZ·TRX·TRY·CELLAR_DOOR)와 같아야 한다.
@@ -502,7 +506,7 @@ let eyeH = EYE;
 const keys = new Set();
 const TREES = [[-6.5, 4.5], [-7, -3.5], [6.8, -4.5], [7.2, 3.8], [-3.5, -6], [4, -6.3], [-8.3, 0.5], [8.4, -0.8], [-5.5, 6.5], [5.8, 6.4], [1.7, 5.1]];
 // 계단·구덩이 (three 좌표. z 는 모델 y 의 부호 반대)
-const SX0 = -2.85, SX1 = -2.0;                                  // 안 계단 폭
+const SX0 = -2.85, SX1 = -1.95;                                 // 안 계단 폭(판정용). 동쪽 끝은 위층 바닥 구멍(HOLE12·HOLE23)의 끝과 같아야 계단에서 위층으로 건너갈 틈이 없다
 const R12 = { z0: 0.6, z1: -2.28, y0: 0.08, y1: 2.9 };          // 1층→2층: z0(아래) 에서 z1(위) 로
 const R23 = { z0: 0.6, z1: -2.1, y0: 2.9, y1: 5.6 };            // 2층→루프탑
 const HOLE12 = [-2.9, -1.95, -2.28, -0.25], HOLE23 = [-2.9, -1.95, -2.1, -0.3];   // [x0,x1,z0,z1] 위층 바닥 구멍
@@ -520,13 +524,15 @@ function surfaceAt(x, z, y) {
   const inFoot = Math.abs(x) < 3.06 && Math.abs(z) < 2.56;
   const inTrench = x > TRX0 && x < TRX1 && z > -2.5 && z < 2.6;
   if (inLot && !inFoot && !inTrench) c.push(0);                                      // 마당
-  if (inHouse) { c.push(0.08); if (!inRect(x, z, HOLE12)) c.push(2.9); }               // 1층 · 2층
+  const on12 = onRamp(R12, SX0, SX1, x, z), on23 = onRamp(R23, SX0, SX1, x, z);
+  // 계단 띠 위에서는 그 아래층 바닥을 후보에서 뺀다 — 안 빼면 발높이에 가장 가까운 바닥(1층)이 늘 뽑혀 계단을 밟지 못하고 그 밑을 지나간다(두호 2026-11-26 '계단이 그냥 통과돼')
+  if (inHouse) { if (!on12) c.push(0.08); if (!inRect(x, z, HOLE12) && !on23) c.push(2.9); }   // 1층 · 2층
   if (x > 0.3 && x < 1.3 && z >= 2.37 && z < 2.62) c.push(0.08);                      // 현관 문턱(벽 두께 구간). 이게 없으면 문이 열려도 문턱에서 막힌다 (두호 2026-11-23 보고)
   if (inHouse && !inRect(x, z, HOLE23)) c.push(5.6);                                   // 루프탑 데크 + 다락 바닥 (어디가 설 수 있는 곳인지는 blocked 가 가른다)
   if (Math.abs(x) < 2.7 && Math.abs(z) < 2.2) c.push(BZ);                              // 지하실
   if (x > -3.06 && x < -2.7 && z > CDOOR[0] && z < CDOOR[1]) c.push(BZ);               // 지하실 문턱
-  if (onRamp(R12, SX0, SX1, x, z)) c.push(rampY(R12, z));
-  if (onRamp(R23, SX0, SX1, x, z)) c.push(rampY(R23, z));
+  if (on12) c.push(rampY(R12, z));
+  if (on23) c.push(rampY(R23, z));
   if (inTrench) c.push(z < RC.z1 ? rampY(RC, Math.max(z, RC.z0)) : BZ);                 // 돌계단, 그 아래 바닥
   let best = NaN, bd = Infinity;
   for (const h of c) { const d = Math.abs(h - y); if (d < bd) { bd = d; best = h; } }
@@ -620,11 +626,11 @@ function updateNear() {
 function openNear() { if (nearRoom) location.href = nearRoom.href; }
 function setHint() {
   if (!hintEl) return;
-  hintEl.textContent = padQuery.matches ? '아래 왼쪽 스틱으로 걷고, 오른쪽 패드를 끌어 둘러봐요. 방에 다가가면 이름이 뜨고, 패드를 톡 치면 열려요'
-    : matchMedia('(hover: none)').matches ? '왼쪽을 누른 채 밀어 걷고, 오른쪽을 끌어 둘러봐요. 방에 다가가면 이름이 떠요'
+  hintEl.textContent = padShown() ? '아래 왼쪽 스틱으로 걷고, 오른쪽 패드를 끌어 둘러봐요. 방에 다가가면 이름이 뜨고, 패드를 톡 치면 열려요'
+    : TOUCH ? '왼쪽을 누른 채 밀어 걷고, 오른쪽을 끌어 둘러봐요. 방에 다가가면 이름이 떠요'
     : '클릭하면 마우스로 둘러보고(Esc 로 풀기), WASD·방향키로 걸어요. 방에 다가가면 이름이 떠요';
 }
-padQuery.addEventListener('change', setHint);
+portraitQuery.addEventListener('change', setHint);
 function startWalk() {
   player.copy(START); wYaw = 0; wPitch = 0.05; nearRoom = null;
   stage.classList.add('walking');
