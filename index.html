@@ -22,7 +22,7 @@
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
   <link rel="alternate" type="application/atom+xml" title="이시로스튜디오 소식" href="feed.xml">
   <link rel="stylesheet" href="assets/site.css">
-  <link rel="stylesheet" href="building/building.css?v=0.13.1">
+  <link rel="stylesheet" href="building/building.css?v=0.14.0">
   <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "이시로스튜디오", "alternateName": ["shiroleestudio", "아기토끼 시로"], "url": "https://shiroleestudio.com/", "logo": "https://shiroleestudio.com/assets/apple-touch-icon.png", "email": "shiroleestudio@gmail.com", "sameAs": ["https://www.youtube.com/@shiroleebunny", "https://github.com/shiroleestudio"]}</script>
 </head>
 <body class="home-page">
@@ -40,6 +40,10 @@
     <div class="labels" id="labels"></div>
     <div class="joy" id="joy" hidden aria-hidden="true"><div class="knob"></div></div>
     <div class="fallback"><img src="building/house.webp" alt="시로의 집 — 1층 찻집, 2층 화실과 공방, 3층 놀이방과 천문대" width="1200" height="703"><p>이 브라우저에서는 3D 그림을 그릴 수 없어요. 아래 목록에서 골라 주세요.</p></div>
+  </div>
+  <div class="pad" id="pad" aria-hidden="true">
+    <div class="pad-stick" id="padStick"><div class="base"><div class="knob"></div></div><small>걷기</small></div>
+    <div class="pad-look" id="padLook"><div class="touch"></div><small>둘러보기 · 톡 치면 열기</small></div>
   </div>
   <nav class="rooms" aria-label="시로의 집 방 목록">
     <h2>시로의 집 방 목록</h2>
@@ -76,6 +80,6 @@
     if(!ok) document.getElementById('stage').classList.add('nowebgl'); })();
 </script>
 <script type="importmap">{"imports":{"three":"./assets/vendor/three/three.module.min.js"}}</script>
-<script type="module" src="building/building.js?v=0.13.1"></script>
+<script type="module" src="building/building.js?v=0.14.0"></script>
 </body>
 </html>

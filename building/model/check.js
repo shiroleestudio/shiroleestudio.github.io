@@ -43,10 +43,14 @@ srv.listen(0, async () => {
     console.log(`[${name}] ${w}x${h}`);
     const st = await page.evaluate(() => {
       const bar = document.querySelector('.bar'), r = bar.getBoundingClientRect();
-      return { walking: window.__house.walking, barBottom: r.bottom, inner: innerHeight, joy: !!document.getElementById('joy') };
+      const pad = document.getElementById('pad'), sb = document.getElementById('stage').getBoundingClientRect();
+      return { walking: window.__house.walking, barBottom: r.bottom, inner: innerHeight, joy: !!document.getElementById('joy'), pad: getComputedStyle(pad).display !== 'none', ratio: sb.width / sb.height };
     });
     if (!st.walking) bad('걷기가 기본이 아님');
     if (st.barBottom > st.inner + 1) bad(`하단 버튼 줄이 화면 밖 (${st.barBottom.toFixed(0)} > ${st.inner})`);
+    // 세로 폰: 무대 16:10 + 아래 가상 게임패드. 그 외는 패드 없음
+    if (name === 'phone') { if (!st.pad) bad('세로 폰에 게임패드가 없음'); if (Math.abs(st.ratio - 1.6) > 0.05) bad(`세로 폰 무대 비율 ${st.ratio.toFixed(2)} (16:10 이어야)`); await page.screenshot({ path: path.join(outDir, 'phone-page.png'), animations: 'disabled', timeout: 60000 }); }
+    else if (st.pad) bad(`${name} 에 게임패드가 보임`);
     await shot(page, path.join(outDir, `${name}-start.png`));
     if (name === 'pc-wide') {
       for (const [label, x, y, z, yaw] of SPOTS) {

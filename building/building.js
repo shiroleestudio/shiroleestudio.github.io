@@ -10,7 +10,7 @@
 // 캐릭터는 아직 없다. TODO(character-sheet).
 import * as THREE from 'three';
 import { GLTFLoader } from '../assets/vendor/three/addons/loaders/GLTFLoader.js';
-import { createBlackHole, BH } from './blackhole.js?v=0.13.1';   // 지하실 한가운데의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
+import { createBlackHole, BH } from './blackhole.js?v=0.14.0';   // 지하실 한가운데의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
 
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('scene');
@@ -356,6 +356,51 @@ function walkRelease(e) {
 }
 stage.addEventListener('pointerup', (e) => { if (walkRelease(e) && moved < 8 && performance.now() - downAt < 400) openNear(); });
 stage.addEventListener('pointercancel', walkRelease);
+// ---- 가상 게임패드 (세로 폰, 두호 2026-11-26): 무대 아래 띠에 왼쪽 고정 스틱(PSP 식) + 오른쪽 터치패드(스팀 컨트롤러 식). 무대 위 터치 조작도 그대로 둔다 ----
+const padStick = document.getElementById('padStick'), padLook = document.getElementById('padLook');
+const padKnob = padStick ? padStick.querySelector('.knob') : null;
+const PAD_R = 40;                                           // 스틱이 움직이는 반지름(px)
+let padStickId = null, padLookId = null, padLastX = 0, padLastY = 0, padMoved = 0, padDownAt = 0;
+const padCenter = { x: 0, y: 0 };
+function padStickMove(e) {
+  const dx = e.clientX - padCenter.x, dy = e.clientY - padCenter.y;
+  const len = Math.hypot(dx, dy), k = len > PAD_R ? PAD_R / len : 1;
+  joy.r = (dx * k) / PAD_R; joy.f = -(dy * k) / PAD_R;
+  padKnob.style.transform = `translate(${(dx * k).toFixed(0)}px, ${(dy * k).toFixed(0)}px)`;
+}
+if (padStick && padLook) {
+  padStick.addEventListener('pointerdown', (e) => {
+    if (padStickId !== null) return;
+    touched(); e.preventDefault();
+    try { padStick.setPointerCapture(e.pointerId); } catch (_) { /* 합성 이벤트 */ }
+    const b = padStick.querySelector('.base').getBoundingClientRect();
+    padCenter.x = b.left + b.width / 2; padCenter.y = b.top + b.height / 2;
+    padStickId = e.pointerId; padStick.classList.add('on'); padStickMove(e);
+  });
+  padStick.addEventListener('pointermove', (e) => { if (e.pointerId === padStickId) { touched(); padStickMove(e); } });
+  const stickRelease = (e) => { if (e.pointerId === padStickId) { padStickId = null; joy.f = joy.r = 0; padStick.classList.remove('on'); padKnob.style.transform = 'translate(0px, 0px)'; } };
+  padStick.addEventListener('pointerup', stickRelease);
+  padStick.addEventListener('pointercancel', stickRelease);
+  padLook.addEventListener('pointerdown', (e) => {
+    if (padLookId !== null) return;
+    touched(); e.preventDefault();
+    try { padLook.setPointerCapture(e.pointerId); } catch (_) { /* 합성 이벤트 */ }
+    padLookId = e.pointerId; padLastX = e.clientX; padLastY = e.clientY; padMoved = 0; padDownAt = performance.now(); padLook.classList.add('on');
+  });
+  padLook.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== padLookId) return;
+    touched();
+    const dx = e.clientX - padLastX, dy = e.clientY - padLastY;
+    padLastX = e.clientX; padLastY = e.clientY; padMoved += Math.abs(dx) + Math.abs(dy);
+    const k = 0.0048;                                       // 패드가 무대보다 작아 무대 끌기(0.0032)보다 1.5배
+    wYaw -= dx * k; wPitch = Math.min(0.9, Math.max(-0.9, wPitch - dy * k * 0.7)); dirty = true;
+  });
+  const lookRelease = (e, tap) => { if (e.pointerId === padLookId) { padLookId = null; padLook.classList.remove('on'); if (tap && padMoved < 8 && performance.now() - padDownAt < 400) openNear(); } };
+  padLook.addEventListener('pointerup', (e) => lookRelease(e, true));
+  padLook.addEventListener('pointercancel', (e) => lookRelease(e, false));
+  for (const el of [padStick, padLook]) el.addEventListener('contextmenu', (e) => e.preventDefault());   // 길게 눌러도 메뉴가 뜨지 않게
+}
+const padQuery = matchMedia('(hover: none) and (orientation: portrait)');
 // iOS Safari: 무대 위 두 손가락은 페이지 확대가 아니다
 stage.addEventListener('gesturestart', (e) => e.preventDefault());
 stage.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
@@ -439,6 +484,7 @@ function frame() {
 // 울타리 문 앞에서 시작해 마당을 걷고, 현관으로 1층 찻집에 들어간다. 찻집 서쪽 벽 계단으로 2층, 그 위 계단으로 루프탑 데크. 집 서쪽 바깥 돌계단으로 지하실.
 // 다락(놀이방·천문대)은 데크에서 서쪽 지붕면의 도머 입구(z 0.05~0.95)로 걸어 들어간다(2026-11-24). 지붕이 낮은 양옆(|x-1.2| > 0.98)은 못 간다.
 // 키보드 WASD·방향키. 터치는 모바일 FPS 식: 왼쪽 반을 누른 자리에 조이스틱이 떠서 밀면 걷고, 오른쪽 반을 끌면 둘러본다(두 손가락 동시 가능).
+// 세로 폰(hover:none + portrait)은 무대를 16:10 으로 줄이고 그 아래 가상 게임패드(#pad: 왼쪽 고정 스틱, 오른쪽 터치패드)를 둔다(두호 2026-11-26). 무대 위 터치도 그대로 된다.
 // 마우스는 클릭하면 잠겨 움직이는 대로 둘러본다(Esc 로 풀림). 잠기지 않으면 끌어서 돌린다.
 // three 좌표: 모델의 남쪽(정문)이 +z, 위가 +y. 집 발자국 ±3 × ±2.5, 현관은 x 0.35~1.25 의 남쪽 벽.
 // 발높이·충돌 수치는 model/build_house.py 의 계단(ST12·ST23·HOLE12·HOLE23)·지하(BZ·TRX·TRY·CELLAR_DOOR)와 같아야 한다.
@@ -572,11 +618,18 @@ function updateNear() {
   if (best !== nearRoom) { nearRoom = best; dirty = true; }
 }
 function openNear() { if (nearRoom) location.href = nearRoom.href; }
+function setHint() {
+  if (!hintEl) return;
+  hintEl.textContent = padQuery.matches ? '아래 왼쪽 스틱으로 걷고, 오른쪽 패드를 끌어 둘러봐요. 방에 다가가면 이름이 뜨고, 패드를 톡 치면 열려요'
+    : matchMedia('(hover: none)').matches ? '왼쪽을 누른 채 밀어 걷고, 오른쪽을 끌어 둘러봐요. 방에 다가가면 이름이 떠요'
+    : '클릭하면 마우스로 둘러보고(Esc 로 풀기), WASD·방향키로 걸어요. 방에 다가가면 이름이 떠요';
+}
+padQuery.addEventListener('change', setHint);
 function startWalk() {
   player.copy(START); wYaw = 0; wPitch = 0.05; nearRoom = null;
   stage.classList.add('walking');
   camera.near = 0.1; camera.far = 80; post.uniforms.near.value = 0.1; post.uniforms.far.value = 80;
-  if (hintEl) hintEl.textContent = matchMedia('(hover: none)').matches ? '왼쪽을 누른 채 밀어 걷고, 오른쪽을 끌어 둘러봐요. 방에 다가가면 이름이 떠요' : '클릭하면 마우스로 둘러보고(Esc 로 풀기), WASD·방향키로 걸어요. 방에 다가가면 이름이 떠요';
+  setHint();
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));                     // 조금 낮은 해상도로 — 프레임이 끊기면 멀미가 난다
   resize();
   dirty = true;
