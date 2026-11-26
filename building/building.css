@@ -15,6 +15,27 @@
 .joy[hidden]{display:none}
 .joy .knob{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:var(--ink);opacity:.75}
 .stage.walking{touch-action:none}
+/* 가상 게임패드(세로 폰만, 두호 2026-11-26): 무대를 16:10 으로 줄이고 남은 자리에 왼쪽 고정 스틱(PSP 식)·오른쪽 터치패드(스팀 컨트롤러 식). 평평한 선 그림, 사이트 토큰만 */
+.pad{display:none}
+.pad small{display:block;margin-top:8px;font-size:12px;letter-spacing:.04em;color:var(--ink-2);text-align:center}
+.pad-stick,.pad-look{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.pad-stick .base{position:relative;width:132px;height:132px;margin:0 auto;border:1px solid var(--rule);border-radius:50%;background:var(--paper-2)}
+.pad-stick .base::before{content:"";position:absolute;inset:14px;border:1px dashed var(--rule);border-radius:50%}
+.pad-stick .knob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:var(--ink);opacity:.8;outline:1px solid var(--paper)}
+.pad-stick.on .knob{opacity:1}
+.pad-look .touch{position:relative;width:100%;height:100%;min-height:132px;border:1px solid var(--rule);border-radius:22px;background:var(--paper-2)}
+.pad-look .touch::before,.pad-look .touch::after{content:"";position:absolute;left:50%;top:50%;background:var(--rule)}
+.pad-look .touch::before{width:18px;height:1px;margin:0 0 0 -9px}
+.pad-look .touch::after{width:1px;height:18px;margin:-9px 0 0 0}
+.pad-look.on .touch{border-color:var(--ink)}
+.stage.nowebgl ~ .pad,.stage.failed ~ .pad{display:none}
+@media(hover:none) and (orientation:portrait){
+  .home-page .stage{flex:0 0 auto;aspect-ratio:16/10;min-height:0;height:auto}
+  .home-page .pad{display:grid;grid-template-columns:148px minmax(0,1fr);gap:16px;align-items:stretch;width:min(900px,100% - 32px);max-height:260px;min-height:170px;margin:auto;padding:0}
+  .home-page .pad-stick{display:flex;flex-direction:column;justify-content:center}
+  .home-page .pad-look{display:flex;flex-direction:column;min-height:0}
+  .home-page .pad-look .touch{flex:1;height:auto}
+}
 .stage.walking{cursor:crosshair}
 .stage.locked{cursor:none}
 .stage.locked::after{content:"";position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:var(--paper);outline:1px solid var(--ink);opacity:.8;pointer-events:none}   /* 마우스가 잠긴 동안 가운데 점 */
