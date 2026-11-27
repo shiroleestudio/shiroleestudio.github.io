@@ -10,7 +10,7 @@
 // 캐릭터는 아직 없다. TODO(character-sheet).
 import * as THREE from 'three';
 import { GLTFLoader } from '../assets/vendor/three/addons/loaders/GLTFLoader.js';
-import { createBlackHole, BH } from './blackhole.js?v=0.15.0';   // 지하실 한가운데의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
+import { createBlackHole, BH } from './blackhole.js?v=0.15.1';   // 지하실 한가운데의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
 
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('scene');
@@ -116,10 +116,11 @@ const post = new THREE.ShaderMaterial({
     camMat: { value: new THREE.Matrix3() }, tanV: { value: 0.5 }, aspect: { value: 1 }, sunDir: { value: SUN_DIR },
     tCover: { value: null }, fade: { value: 0.0 },   // 블랙홀멍: 블랙홀이 덮는 정도(화면 버퍼 알파)와 배경을 지우는 정도
     ssao: { value: 0.0 },                              // 화면 공간 구석 그늘 세기(리모델링 3, 2026-11-27). 0 이면 끔
+    bhOn: { value: 0.0 },                              // 블랙홀이 그려지는 프레임(1): 블랙홀이 덮는 곳에는 필름 그레인을 넣지 않는다(검은 지평선 위의 알갱이가 자글거린다, 2026-11-27)
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }',
   fragmentShader: `
-    uniform sampler2D tColor, tDepth, tBloom, tBloom2, tCover; uniform vec2 texel; uniform float near, far, night, fogDensity, exposure, fade, time, tanV, aspect, cloud, ssao;
+    uniform sampler2D tColor, tDepth, tBloom, tBloom2, tCover; uniform vec2 texel; uniform float near, far, night, fogDensity, exposure, fade, time, tanV, aspect, cloud, ssao, bhOn;
     uniform vec3 zen, hor, fogCol, sunCol, sunDir; uniform mat3 camMat; varying vec2 vUv;
     float lin(float z){ return (2.0*near*far)/(far+near-(z*2.0-1.0)*(far-near)); }
     float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }
@@ -193,6 +194,7 @@ const post = new THREE.ShaderMaterial({
       // 비네트 + 필름 그레인(화소마다 고정 — 깜빡이지 않는다)
       col *= 1.0 - 0.14 * dot(q, q) * 0.7;
       float g = hash(floor(gl_FragCoord.xy)) - 0.5;
+      if (bhOn > 0.5) g *= 1.0 - texture2D(tCover, vUv).a;                 // 블랙홀 위에는 그레인 없음(2026-11-27)
       col += g * 0.022;
       if (fade > 0.0) {                                                     // 멍: 블랙홀이 아닌 곳은 어둠으로, 어둠 속에 별이 조금
         vec4 tc = texture2D(tCover, vUv); float cov = tc.a;
@@ -442,7 +444,7 @@ function bhGovern(dt) {
   bhAcc += dt; bhN++;
   if (bhN < 45) return;
   const avg = bhAcc / bhN; bhAcc = 0; bhN = 0;
-  if (avg > 0.034 && bhQ > 0.42) { bhQ = Math.max(0.4, bhQ * 0.8); bhResize(); }
+  if (avg > 0.034 && bhQ > 0.52) { bhQ = Math.max(0.5, bhQ * 0.8); bhResize(); }   // 최저 0.4→0.5(2026-11-27): 더 줄이면 블록이 보인다
   else if (avg < 0.014 && bhQ < 1) { bhQ = Math.min(1, bhQ * 1.15); bhResize(); }
 }
 function resize() {
@@ -487,7 +489,7 @@ function frame() {
     // 멍: 지하실에서 조작이 없으면 방이 사라진다 (블랙홀 공이 안 보이면 지우지 않는다 — 깜깜해지기만 하니까)
     const idle = (now - lastInput) / 1000;
     fade = bhOn ? Math.min(1, Math.max(0, (idle - IDLE.start) / IDLE.dur)) : 0;
-    post.uniforms.fade.value = fade; post.uniforms.tCover.value = bh.coverage();
+    post.uniforms.fade.value = fade; post.uniforms.tCover.value = bh.coverage(); post.uniforms.bhOn.value = bhOn ? 1 : 0;
 
     // 1) 장면(HDR) 2) 블룸 3) 합성
     post.uniforms.time.value = reduceMotion.matches ? 0 : now / 1000;
