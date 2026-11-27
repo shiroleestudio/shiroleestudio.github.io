@@ -256,8 +256,9 @@ RECIPES = {
     'wood2':   (lambda c: wood(c, 4, False, False, 15), 1.2, False, 3.5),
     'plaster': (lambda c: plaster(c, 4), 0.5, False, 3.0),
     'cream':   (lambda c: plaster(c, 8), 0.5, False, 3.0),
-    'shingle': (lambda c: shingles(c, 6, 3), 1.0, False, 5.0),
-    'shingle2': (lambda c: shingles(c, 6, 9), 1.0, False, 5.0),
+    'shingle': (lambda c: shingles(c, 6, 3), 0.5, False, 5.0),     # 0.5 타일/m: 사진(RoofingTiles002, 2026-11-27) 한 장이 2 m — 비늘 한 장이 약 20 cm
+    'shingle2': (lambda c: shingles(c, 6, 9), 0.5, False, 5.0),
+    'bark':    (lambda c: wood(c, 3, False, True, 21), 1.5, False, 4.0),     # 나무 기둥 껍질(사진 Bark012, 2026-11-27). 생성 텍스처는 사진이 없을 때만
     'stone':   (lambda c: stone(c, 5), 1.0, False, 3.2),
     'stone2':  (lambda c: stone(c, 10), 1.0, False, 3.2),
     'grass':   (lambda c: grass(c, 6), 0.7, False, 4.0),
@@ -266,7 +267,7 @@ RECIPES = {
 # 법선·거칠기 지도를 같이 쓰는 변형 (색만 다르다) — 파일 크기 절약
 FAMILY = {'log2': 'log', 'plank2': 'plank', 'wood2': 'beam', 'cream': 'plaster', 'shingle2': 'shingle', 'stone2': 'stone', 'grass2': 'grass'}
 # 색 지도 크기: 눈에 가까운 큰 면만 1024, 나머지는 512 (용량)
-COLOR_SIZE = {'log': 1024, 'plank': 1024, 'floor': 1024, 'shingle': 1024, 'stone': 1024, 'grass': 1024, 'plaster': 1024}
+COLOR_SIZE = {'bark': 512, 'log': 1024, 'plank': 1024, 'floor': 1024, 'shingle': 1024, 'stone': 1024, 'grass': 1024, 'plaster': 1024}
 
 
 def _find(asset_dir, stem):
