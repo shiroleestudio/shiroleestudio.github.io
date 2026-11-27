@@ -10,7 +10,7 @@
 // 캐릭터는 아직 없다. TODO(character-sheet).
 import * as THREE from 'three';
 import { GLTFLoader } from '../assets/vendor/three/addons/loaders/GLTFLoader.js';
-import { createBlackHole, BH } from './blackhole.js?v=0.14.1';   // 지하실 한가운데의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
+import { createBlackHole, BH } from './blackhole.js?v=0.14.2';   // 지하실 한가운데의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
 
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('scene');
@@ -579,7 +579,6 @@ function blocked(x, z, y) {
   if (x < TRX0 - 0.0 && x > TRX0 - 0.25 && z > -1.9 && z < 2.1) return true;                 // 구덩이 서쪽 옹벽
   if (z > 1.95 && z < 2.15 && x > TRX0 - 0.25 && x < TRX1) return true;                      // 구덩이 남쪽 옹벽
   if (inside) for (const [tx, tz] of TABLES) if (Math.hypot(x - tx, z - tz) < 0.42) return true;
-  if (Math.hypot((x + 5.2) / 1.7, (z + 2.0) / 1.3) < 1) return true;                          // 연못
   for (const [tx, tz] of TREES) if (Math.hypot(x - tx, z - tz) < 0.45) return true;
   return false;
 }
