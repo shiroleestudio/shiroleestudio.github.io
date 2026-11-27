@@ -19,19 +19,23 @@ float hash(vec3 p){ p = fract(p * 0.3183099 + .1); p *= 17.0; return fract(p.x *
 float noise(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3. - 2. * f);
   return mix(mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x), mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
              mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x), mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z); }
-float fbm(vec3 p){ float a = 0., w = .5; for (int i = 0; i < 5; i++) { a += w * noise(p); p *= 2.07; w *= .5; } return a; }
+float fbm(vec3 p){ float a = 0., w = .5; for (int i = 0; i < 4; i++) { a += w * noise(p); p *= 2.07; w *= .5; } return a; }   // 4옥타브(5→4, 2026-11-27 두호 '자글거림'): 화소보다 가는 실은 반짝임만 만든다
 // 원반 색(반지름 기준, 인터스텔라 가르강튀아 참고 이미지, 두호 2026-11-24): 안쪽 흰 크림 → 노랑 → 주황 → 바깥은 어두운 적갈색으로 꺼진다
 vec3 diskColor(float rc){ float x = (rc - 2.3) / 7.7;
   vec3 c0 = vec3(1., .97, .90), c1 = vec3(1., .72, .36), c2 = vec3(.62, .22, .07), c3 = vec3(.10, .03, .01);
   return mix(mix(mix(c0, c1, smoothstep(0., .22, x)), c2, smoothstep(.22, .62, x)), c3, smoothstep(.62, 1., x)); }
+const float HK = 5.0;                                                      // 빛안개 두께(exp(-HK·|y|))
+float hzF(float y){ return sign(y) * (1. - exp(-HK * abs(y))) / HK; }          // exp(-HK|y|) 의 부정적분 — 걸음 선분을 해석적으로 적분한다(2026-11-27 두호 '자글거림': 걸음(0.1~0.35)이 두께(0.2)보다 커서 표본점이 평면 어디에 걸리느냐로 동심원 줄무늬가 생겼다)
+float hzSeg(float y0, float y1, float dt){ float dy = y1 - y0; return abs(dy) < 1e-4 ? exp(-HK * abs(y0)) * dt : dt * (hzF(y1) - hzF(y0)) / dy; }
 const float rin = 2.3, rout = 6.5;                                        // 원반 바깥 10→6.5(2026-11-27 두호 '체감 6배'): 벽가 거리 7 단위가 원반 바로 밖이 되게. 그림자(2.6) 대비 2.5배
 // 원반 밀도: 매끈한 반지름 분포 × 나선으로 길게 늘인 실(각도에 반지름을 더해 비틀어 나선이 된다, MisterPrada/singularity 의 회전 위상 발상만 참고) — 가는 동심원 줄무늬는 넣지 않는다
 float diskDens(float rc, float A){
   float prof = smoothstep(rin, rin + .4, rc) * (1. - smoothstep(rout - 1.8, rout, rc));
-  float S = A + rc * 0.55;                                                   // 나선 위상
-  float fil = fbm(vec3(rc * 0.8, 2.2 * cos(S), 2.2 * sin(S)));                // 각도를 원 위의 점으로 넣어 둘레가 이어진다(atan 의 ±π 이음새 없음)
-  float fil2 = noise(vec3(rc * 2.6, 5.0 * cos(2. * S), 5.0 * sin(2. * S)));
-  return prof * (0.55 + 0.6 * fil) * (0.85 + 0.3 * fil2);                   // 대비를 낮게 — 참고 이미지는 실이 많아도 전체가 매끈하게 빛난다
+  float S = A + rc * 0.35;                                                   // 나선 위상(비틀림 0.55→0.35, 2026-11-27: 눕혀 보면 실이 2화소 줄무늬로 눌려 반짝였다)
+  float fil = fbm(vec3(rc * 0.5, 2.2 * cos(S), 2.2 * sin(S)));                // 반지름 방향 결 0.8→0.5                // 각도를 원 위의 점으로 넣어 둘레가 이어진다(atan 의 ±π 이음새 없음)
+  float fil2 = noise(vec3(rc * 1.4, 3.0 * cos(2. * S), 3.0 * sin(2. * S)));   // 주파수 절반·진폭 2/3(2026-11-27): 가는 결이 거리마다 다른 걸음에 걸려 동심원 줄무늬·반짝임이 됐다
+  float k = smoothstep(rin, rin + 1.6, rc);                                  // 안쪽(렌즈로 가장 눌리는 곳)은 결을 줄여 매끈한 밝은 띠로(2026-11-27)
+  return prof * (0.55 + 0.6 * mix(0.5, fil, k)) * (0.9 + 0.2 * fil2 * k);                   // 대비를 낮게 — 참고 이미지는 실이 많아도 전체가 매끈하게 빛난다
 }
 void main(){
   vec3 rd = normalize(rayMat * vec3(v.x * tanV * aspect, v.y * tanV, -1.));
@@ -43,7 +47,8 @@ void main(){
   vec3 h = cross(p, vel); float h2 = dot(h, h);
   vec3 col = vec3(0); float trans = 1., hzAcc = 0.;
   bool hit = false;
-  float ex = clamp(length(camPos) / 12.0, 0.4, 1.0);                         // 가까이 갈수록(원반 안쪽) 빛을 눌러 하얗게 타지 않게(2026-11-27)
+  float ex = clamp(length(camPos) / 16.0, 0.28, 1.0);                        // 빛안개 노출: 2026-11-27 15:13 거리 4.8 에 맞춰 더 눌렀다(12→16, 최저 0.4→0.28) — 평면 가까이 긴 경로가 타는 건 빛안개다
+  float exd = clamp(length(camPos) / 12.0, 0.45, 1.0);                       // 원반 노출은 덜 누른다(최저 0.45): 위에서 내려다본 원반은 금빛으로 밝아야 한다                         // 가까이 갈수록(원반 안쪽) 빛을 눌러 하얗게 타지 않게(2026-11-27)
   for (int i = 0; i < 360; i++) {                                           // 걸음을 촘촘히(0.05 r) 하고 횟수를 늘려 광자 고리·렌즈 가장자리가 매끈하게
     float r = length(p);
     if (r < 1.02) { hit = true; break; }
@@ -54,27 +59,31 @@ void main(){
     vec3 an = -1.5 * h2 * pn / pow(rn, 5.); vec3 vn = vh + an * dt * .5;
     float rcv = length(p.xz);
     // 원반 위아래로 번지는 얇은 빛안개(원반에 두께감, 참고 이미지의 고리 둘레 번짐) — 평면 가까이에서만 적분한다
-    if (abs(p.y) < 1.2 && rcv > rin && rcv < rout + 1.5) {
-      float hz = exp(-abs(p.y) * 5.0) * smoothstep(rin, rin + .6, rcv) * (1. - smoothstep(rout - 2., rout + 1.0, rcv));
-      float hzd = hz * dt * (0.02 + 0.14 * pow(rin / rcv, 1.6)) * ex;
-      if (hzAcc < 0.55) { col += trans * diskColor(rcv) * hzd; hzAcc += hzd; }   // 빛안개 상한: 평면 가까이 긴 경로가 하얗게 타는 것을 막는다(2026-11-27)
+    if (min(abs(p.y), abs(pn.y)) < 1.2 && rcv > rin && rcv < rout + 1.5) {
+      float hz = hzSeg(p.y, pn.y, dt) * smoothstep(rin, rin + .6, rcv) * (1. - smoothstep(rout - 2., rout + 1.0, rcv));
+      float hzd = hz * (0.02 + 0.14 * pow(rin / rcv, 1.6)) * ex;
+      if (hzAcc < 0.4) { col += trans * diskColor(rcv) * hzd; hzAcc += hzd; }   // 빛안개 상한: 평면 가까이 긴 경로가 하얗게 타는 것을 막는다(2026-11-27)
     }
     if (p.y * pn.y < 0.) {                                                   // 원반 평면을 지난다
-      float f = p.y / (p.y - pn.y); vec3 c = mix(p, pn, f); float rc = length(c.xz);
+      float f = p.y / (p.y - pn.y);
+      // 교차점을 직선 보간 대신 짧은 걸음(dt·f)으로 다시 적분해 구한다(2026-11-27 두호 '자글거림'): 이웃 화소가 다른 걸음 번호에서
+      // 평면을 지나면 보간 오차(걸음²×곡률)가 뛰어 원반에 가는 동심원 줄무늬가 생겼다
+      float ds = dt * f; vec3 vs = vel + a * ds * .5; vec3 c = p + vs * ds; vec3 vc = vs + (-1.5 * h2 * c / pow(length(c), 5.)) * ds * .5;
+      float rc = length(c.xz);
       if (rc > rin && rc < rout) {
         float ang = atan(c.z, c.x);
         float om = 2.2 * pow(rc, -1.5);
-        float A = ang + om * t * 2.2;                                        // 차등 회전(안쪽이 빠름)
+        float A = ang + om * t * 1.3;                                        // 차등 회전(안쪽이 빠름). 2.2→1.3(2026-11-27): 빠른 안쪽이 프레임마다 결을 바꿔 반짝였다
         float dens = diskDens(rc, A);
         // 도플러 빔 δ³ (gargantua-cinema 의 식): 원 궤도 속도 β = 1/√(2(r−1)), δ = 1/(γ(1−βμ)), μ = 속도 방향 · 카메라 쪽. 다가오는 쪽이 훨씬 밝다
         vec3 vd = normalize(vec3(-sin(ang), 0., cos(ang)));
         float beta = min(0.99, inversesqrt(2.0 * max(rc - 1.0, 0.05)));
         float gam = inversesqrt(1.0 - beta * beta);
-        float mu = dot(vd, -normalize(vn));
+        float mu = dot(vd, -normalize(vc));
         float del = 1.0 / (gam * (1.0 - beta * mu));
         float dop = clamp(del * del * del, 0.12, 3.0) * 0.6;                 // 상한 5→3(2026-11-27): 가까이서 다가오는 쪽이 하얗게 타지 않게
         float grav = sqrt(max(0., 1. - 1.0 / rc));                          // 중력 적색편이
-        vec3 e = diskColor(rc) * dens * dop * grav * (0.3 + 2.6 * pow(rin / rc, 1.6)) * ex;
+        vec3 e = diskColor(rc) * dens * dop * grav * (0.3 + 2.6 * pow(rin / rc, 1.6)) * exd;
         float alpha = clamp(dens * 0.8, 0., 1.);
         col += trans * e * alpha; trans *= (1. - alpha * 0.92);
         if (trans < 0.02) break;
@@ -102,7 +111,8 @@ precision highp float;
 out vec4 o;
 uniform sampler2D base, glow, glow2; uniform vec2 res;
 void main(){ vec2 uv = gl_FragCoord.xy / res;
-  vec4 b = texture(base, uv);
+  vec2 px = 0.8 / vec2(textureSize(base, 0));                                               // 버퍼 화소의 0.8
+  vec4 b = texture(base, uv) * 0.2 + (texture(base, uv + vec2(px.x, px.y)) + texture(base, uv + vec2(-px.x, px.y)) + texture(base, uv + vec2(px.x, -px.y)) + texture(base, uv + vec2(-px.x, -px.y))) * 0.2;   // 5점 표본(2026-11-27 두호 '자글거림'): 광자 고리·렌즈 2차상처럼 화소보다 가는 것을 1.5 화소쯤으로 눌러 반짝이지 않게
   float m = mix(1.0, 0.1, step(0.999, b.a));                                               // 지평선(a=1) 안으로는 빛무리가 번지지 않는다 — 그림자는 검어야 한다
   vec3 g = (texture(glow, uv).rgb * 0.8 + texture(glow2, uv).rgb * 0.7) * m;
   vec3 c = (b.rgb + g) * 1.15;
@@ -116,8 +126,8 @@ export const BH = {
   // 거리 압축(2026-11-25 두호 "현실성을 좀 무시해도 돼. 가까이 가려 할수록 진짜 블랙홀 사이즈처럼 커 보이는 거지"):
   // 실제 거리 d(m) 를 셰이더 거리 g(d) 단위로 옮긴다. 벽가(3.2 m) 에서는 16 단위(원반 밖, 인터스텔라 구도), 가장 가까운 0.7 m(충돌 원) 에서는
   // 3.0 단위 — 원반 안쪽까지 들어가지만 앙각을 과장(TILT)해 위에서 내려다보므로 지평선이 화면을 크게 채운다.
-  NEAR_M: 0.7, FAR_M: 3.2, NEAR_U: 2.4, FAR_U: 7.0,    // 2026-11-27 두호 '체감 6배': 벽가 16 → 7 단위(원반 바깥 6.5 바로 밖, 그림자가 화면 폭의 2/3), 가장 가까이 3 → 2.4(지평선이 화면을 덮는다)   // 2026-11-25 두호 '10배는 더 작아져도' → 가장 가까이 6.5 → 3.0 단위(광자 구 1.5 의 두 배 거리, 원반 안쪽 가장자리 2.3 바로 밖)
-  TILT_FAR: 2.5, TILT_NEAR: 0.3,                // 2026-11-27: 벽가 2.5배(원반을 살짝 내려다보는 인터스텔라 구도)                // 앙각 배율(실제 앙각의 탄젠트에 곱한다): 벽가 2배(살짝 내려다보는 인터스텔라 구도) → 가장 가까이 0.3배(눈이 원반 높이 가까이 내려가
+  NEAR_M: 0.7, FAR_M: 3.2, NEAR_U: 2.0, FAR_U: 4.8,    // 2026-11-27 15:13 두호 '여기서 2배 더': 벽가 7 → 4.8 단위(원반 안, 그림자 지름 약 65°), 가장 가까이 2.4 → 2.0   // 2026-11-27 두호 '체감 6배': 벽가 16 → 7 단위(원반 바깥 6.5 바로 밖, 그림자가 화면 폭의 2/3), 가장 가까이 3 → 2.4(지평선이 화면을 덮는다)   // 2026-11-25 두호 '10배는 더 작아져도' → 가장 가까이 6.5 → 3.0 단위(광자 구 1.5 의 두 배 거리, 원반 안쪽 가장자리 2.3 바로 밖)
+  TILT_FAR: 3.2, TILT_NEAR: 0.3,                // 2026-11-27 15:13: 벽가 3.2배(원반 안에 서도 원반을 내려다보게)   // 2026-11-27: 벽가 2.5배(원반을 살짝 내려다보는 인터스텔라 구도)                // 앙각 배율(실제 앙각의 탄젠트에 곱한다): 벽가 2배(살짝 내려다보는 인터스텔라 구도) → 가장 가까이 0.3배(눈이 원반 높이 가까이 내려가
                                                 // 원반 위를 걷는 느낌, 지평선이 눈앞에 벽처럼 선다 — 두호 2026-11-25 "위에서 보는 게 아니고 강착원반에서 걷는 느낌"). 시선은 되돌려 블랙홀이 실제 자리에 보인다
   tilt(d) { const t = Math.min(1, Math.max(0, (d - this.NEAR_M) / (this.FAR_M - this.NEAR_M))); return this.TILT_NEAR + (this.TILT_FAR - this.TILT_NEAR) * t; },
   dist(d) { const t = Math.min(1, Math.max(0, (d - this.NEAR_M) / (this.FAR_M - this.NEAR_M))); return this.NEAR_U * Math.pow(this.FAR_U / this.NEAR_U, t); },   // 지수 보간: 가까울수록 급히 커진다

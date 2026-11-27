@@ -76,12 +76,12 @@ srv.listen(0, async () => {
       const f1 = await shot(page, path.join(outDir, 'blackhole-1.png')); await page.waitForTimeout(700);
       const f2 = await shot(page, path.join(outDir, 'blackhole-2.png'));
       if (f1.equals(f2)) bad('블랙홀이 움직이지 않음');
-      // 실제로 그려졌는지: 캡처 가운데 띠에 밝은 화소(원반)와 아주 어두운 화소(지평선)가 함께 있어야 한다
+      // 실제로 그려졌는지: 캡처에 밝은 화소(원반)와 아주 어두운 화소(지평선)가 함께 있어야 한다
       // (WebGL 캔버스는 그린 뒤 버퍼를 비워 drawImage 로 읽을 수 없으니, 스크린샷 PNG 를 페이지 안에서 풀어 센다)
       const bright = await page.evaluate((b64) => new Promise((res) => {
         const im = new Image(); im.onload = () => {
           const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const x = c.getContext('2d'); x.drawImage(im, 0, 0);
-          const y0 = Math.floor(im.height * 0.45), d = x.getImageData(0, y0, im.width, Math.max(1, Math.floor(im.height * 0.1))).data; let hi = 0, lo = 0;
+          const d = x.getImageData(0, 0, im.width, im.height).data; let hi = 0, lo = 0;   // 화면 전체(2026-11-27: 블랙홀이 커져 가운데 띠는 그림자뿐이다)
           for (let i = 0; i < d.length; i += 4) { const m = Math.max(d[i], d[i + 1], d[i + 2]); if (m > 180) hi++; if (m < 25) lo++; }
           res({ hi, lo });
         }; im.src = 'data:image/png;base64,' + b64;
