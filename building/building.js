@@ -10,7 +10,7 @@
 // 캐릭터는 아직 없다. TODO(character-sheet).
 import * as THREE from 'three';
 import { GLTFLoader } from '../assets/vendor/three/addons/loaders/GLTFLoader.js';
-import { createBlackHole, BH } from './blackhole.js?v=0.14.2';   // 지하실 한가운데의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
+import { createBlackHole, BH } from './blackhole.js?v=0.15.0';   // 지하실 한가운데의 블랙홀 (building.js 와 함께 ?v= 를 올린다)
 
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('scene');
@@ -115,10 +115,11 @@ const post = new THREE.ShaderMaterial({
     night: { value: 0.0 }, fogDensity: { value: 0.011 }, exposure: { value: 1.0 }, cloud: { value: 1.0 },
     camMat: { value: new THREE.Matrix3() }, tanV: { value: 0.5 }, aspect: { value: 1 }, sunDir: { value: SUN_DIR },
     tCover: { value: null }, fade: { value: 0.0 },   // 블랙홀멍: 블랙홀이 덮는 정도(화면 버퍼 알파)와 배경을 지우는 정도
+    ssao: { value: 0.0 },                              // 화면 공간 구석 그늘 세기(리모델링 3, 2026-11-27). 0 이면 끔
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }',
   fragmentShader: `
-    uniform sampler2D tColor, tDepth, tBloom, tBloom2, tCover; uniform vec2 texel; uniform float near, far, night, fogDensity, exposure, fade, time, tanV, aspect, cloud;
+    uniform sampler2D tColor, tDepth, tBloom, tBloom2, tCover; uniform vec2 texel; uniform float near, far, night, fogDensity, exposure, fade, time, tanV, aspect, cloud, ssao;
     uniform vec3 zen, hor, fogCol, sunCol, sunDir; uniform mat3 camMat; varying vec2 vUv;
     float lin(float z){ return (2.0*near*far)/(far+near-(z*2.0-1.0)*(far-near)); }
     float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }
@@ -159,6 +160,22 @@ const post = new THREE.ShaderMaterial({
       vec3 dir = normalize(camMat * vec3(q.x * tanV * aspect, q.y * tanV, -1.0));
       vec3 bg = sky(dir);
       float dz = lin(texture2D(tDepth, vUv).r);
+      // SSAO(2026-11-27 리모델링 3): 깊이 지도에서 화소 둘레 12점을 재어, 나보다 앞(가까이)에 있는 이웃이 많을수록 구석 그늘.
+      // 반지름 0.45 m 를 화면 비율로 바꾸고(멀수록 작게), 화소마다 다른 각도로 돌려 띠무늬를 없앤다. 정점 AO·라이트맵이 못 잡는 소품 밑·벽 모서리를 조인다.
+      if (ssao > 0.0 && c.a > 0.5) {
+        float rad = 0.45 / (2.0 * dz * tanV);
+        vec2 rv = vec2(rad / aspect, rad);
+        float ang = hash(floor(gl_FragCoord.xy) + 0.37) * 6.2832;
+        float occ = 0.0;
+        for (int i = 0; i < 12; i++) {
+          float a = ang + float(i) * 0.5236; float rr = (0.25 + 0.75 * fract(float(i) * 0.618 + 0.1));
+          vec2 o = vec2(cos(a), sin(a)) * rv * rr;
+          float zs = lin(texture2D(tDepth, clamp(vUv + o, 0.001, 0.999)).r);
+          float d = dz - zs;                                                   // 양수 = 이웃이 더 가깝다(가린다)
+          occ += step(0.04, d) * (1.0 - smoothstep(0.45, 1.2, d)) * (1.0 - rr * 0.35);
+        }
+        col *= 1.0 - ssao * occ / 12.0 * 0.9;
+      }
       float fog = 1.0 - exp(-dz * fogDensity);
       vec3 fc = mix(fogCol, bg, 0.5);
       col = mix(col, fc, fog * 0.9);
@@ -635,6 +652,7 @@ function startWalk() {
   stage.classList.add('walking');
   camera.near = 0.1; camera.far = 80; post.uniforms.near.value = 0.1; post.uniforms.far.value = 80;
   setHint();
+  post.uniforms.ssao.value = TOUCH ? 0.55 : 0.8;                                 // 폰은 깊이 12점 읽기가 부담이라 약하게
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));                     // 조금 낮은 해상도로 — 프레임이 끊기면 멀미가 난다
   resize();
   dirty = true;

@@ -28,7 +28,7 @@ COL = {
     'plaster': '#e9e2d0', 'paper': '#e2dbc8', 'rule': '#bfb39b', 'ink': '#3a2c22',
     'shingle': '#5a4636', 'shingle2': '#4c3a2c', 'stone': '#8b877e', 'stone2': '#77736b',
     'grass': '#9aa47a', 'grass2': '#8a9568', 'green': '#4a5e4f', 'sage': '#7f9378',
-    'leaf': '#6f7f5c', 'pot': '#b07a5c', 'brass': '#a88a55', 'night': '#2b3240',
+    'leaf': '#6f7f5c', 'leafcard': '#6f7f5c', 'bark': '#6b5a44', 'pot': '#b07a5c', 'brass': '#a88a55', 'night': '#2b3240',
     'door': '#2f3640', 'rug': '#b89a7a', 'red': '#a85a48', 'cream': '#ece4d2',
     'blanket': '#8d98a0', 'jar': '#cfc8b4', 'coffee': '#5b4130',
     'glow': '#f0d394', 'glowbulb': '#f6e2b0',
@@ -96,6 +96,36 @@ def sphere(grp, matkey, center, r, seg=12, scale=(1, 1, 1), half=False):
         bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < -1e-4], context='VERTS')
     bm.transform(Matrix.Translation(Vector(center)) @ Matrix.Diagonal((*scale, 1)))
     return _obj_from_bm(bm, 'sph', matkey, grp, True)
+
+def leaf_cards(grp, center, r, n, seed, size=0.42, scale=(1, 1, 1.1)):
+    """잎 나무(2026-11-27 리모델링 3): 공 모양 잎 뭉치 대신, 잎 사진(leafcard.webp, 3×3 잎 격자) 을 붙인 네모 카드 n 장을
+    반지름 r 의 타원 안에 흩뿌린다. 카드는 양면이고 알파 컷(MASK) — 멀리서는 둥근 수관, 가까이서는 잎이 낱낱이 보인다.
+    카드마다 UV 를 직접 쓴다(project_uvs 는 UV 가 이미 있는 메시를 건너뛴다). 안쪽은 어두운 공('leaf')으로 채워 비치지 않게 한다."""
+    rng = random.Random(seed)
+    bm = bmesh.new()
+    uv_layer = bm.loops.layers.uv.new('UVMap')
+    cx, cy, cz = center
+    for _ in range(n):
+        # 타원 껍질 쪽에 치우치게 (안쪽 40% 는 공이 채운다)
+        while True:
+            v = Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-1, 1)))
+            if 0.45 < v.length <= 1.0:
+                break
+        pos = Vector((cx + v.x * r * scale[0], cy + v.y * r * scale[1], cz + v.z * r * scale[2]))
+        # 카드는 대체로 바깥을 향하고(법선 ≈ 방사 방향) 살짝 흔든다, 둘레 방향으로 아무렇게나 돈다
+        nrm = (v.normalized() + Vector((rng.uniform(-0.5, 0.5), rng.uniform(-0.5, 0.5), rng.uniform(-0.3, 0.3)))).normalized()
+        up = Vector((0, 0, 1)) if abs(nrm.z) < 0.9 else Vector((1, 0, 0))
+        t1 = nrm.cross(up).normalized(); t2 = t1.cross(nrm).normalized()
+        a = rng.uniform(0, 2 * math.pi); ca, sa = math.cos(a), math.sin(a)
+        e1 = (t1 * ca + t2 * sa) * (size * rng.uniform(0.75, 1.25) / 2); e2 = (t2 * ca - t1 * sa) * (size * rng.uniform(0.9, 1.4) / 2)
+        verts = [bm.verts.new(pos - e1 - e2), bm.verts.new(pos + e1 - e2), bm.verts.new(pos + e1 + e2), bm.verts.new(pos - e1 + e2)]
+        f = bm.faces.new(verts)
+        i, j = rng.randrange(3), rng.randrange(3)          # 3×3 격자에서 잎 하나
+        u0, v0 = i / 3, j / 3
+        for loop, (uu, vv) in zip(f.loops, ((u0, v0), (u0 + 1 / 3, v0), (u0 + 1 / 3, v0 + 1 / 3), (u0, v0 + 1 / 3))):
+            loop[uv_layer].uv = (uu, vv)
+    _obj_from_bm(bm, 'leaves', 'leafcard', grp)
+    sphere(grp, 'leaf', center, r * 0.62, seg=10, scale=scale)
 
 def prism(grp, matkey, pts2d, y0, y1, plane='XZ'):
     """평면 다각형(x,z) 을 y0..y1 로 뽑은 기둥 (박공 삼각형 등)."""
@@ -241,7 +271,7 @@ for side in 'SNEW':
         ext = 0.18 if (k % 2 == (0 if side in 'SN' else 1)) else 0.02    # 모서리에서 엇갈려 튀어나온 통나무 끝
         for s0, s1 in subtract((-L / 2 - ext, L / 2 + ext), holes):
             c = wpos(side, (s0 + s1) / 2, v, 0)
-            cyl(g, 'log' if k % 3 else 'log2', c, 0.128, s1 - s0, axis='X' if side in 'SN' else 'Y', seg=8)
+            cyl(g, 'log' if k % 3 else 'log2', c, 0.128, s1 - s0, axis='X' if side in 'SN' else 'Y', seg=14)   # 14각(2026-11-27 리모델링 3 '통나무 둥글리기', 전엔 8각)
     rect_minus(g, 'plaster', side, (-L / 2 + T, L / 2 - T), (0.06, H1), -T / 2 - 0.02, 0.04, ops)
     for o in ops:
         if o[4] == 'win':
@@ -541,7 +571,7 @@ chair(gT, -2.2, 1.1, Z3, math.pi * 0.15)
 chair(gT, -1.2, 1.4, Z3, -math.pi * 0.1)
 box(gT, 'blanket', (-2.15, 1.25, Z3 + 0.62), (0.5, 0.12, 0.42), rot=(0.25, 0, math.pi * 0.15))
 cyl(gT, 'pot', (-2.6, -1.9, Z3 + 0.2), 0.2, 0.4, r2=0.16, seg=10)
-sphere(gT, 'leaf', (-2.6, -1.9, Z3 + 0.6), 0.32, scale=(1, 1, 1.2))
+leaf_cards(gT, (-2.6, -1.9, Z3 + 0.6), 0.32, 90, seed=31, size=0.15, scale=(1, 1, 1.2))
 box(gT, 'plank2', (-1.7, -1.2, Z3 + 0.25), (0.5, 0.5, 0.05))                # 작은 탁자
 cyl(gT, 'cream', (-1.65, -1.15, Z3 + 0.32), 0.06, 0.1, seg=10)
 # 줄 전구
@@ -658,7 +688,7 @@ for (x, y, s) in [(-W / 2 - 0.45, -D / 2 - 0.35, 1.0), (-W / 2 - 0.2, -D / 2 - 0
                   (W / 2 + 0.45, -D / 2 - 0.35, 0.9), (W / 2 + 0.4, D / 2 + 0.3, 1.0),
                   (0.0, -D / 2 - 0.4, 0.6)]:   # 서쪽 뒤(-W/2-0.4, D/2+0.2) 화분은 돌계단 입구를 막아 뺐다(두호 2026-11-27)
     cyl(gx, 'pot', (x, y, 0.18 * s), 0.18 * s, 0.36 * s, r2=0.14 * s, seg=10)
-    sphere(gx, 'leaf', (x, y, 0.5 * s), 0.26 * s, seg=10, scale=(1, 1, 1.25))
+    leaf_cards(gx, (x, y, 0.52 * s), 0.27 * s, int(70 * s) + 16, seed=int(x * 3 + y * 17 + 7), size=0.14 * s, scale=(1, 1, 1.25))   # 화분 관목도 잎 카드
 for row in range(3):
     for i in range(5 - row):
         y = -D / 2 + 0.4 + i * 0.27 + row * 0.135
@@ -683,9 +713,11 @@ fence((-FX, -FY), (-FX, FY)); fence((FX, -FY), (FX, FY))            # 동·서
 # 나무: 둥근 잎 + 기둥, 울타리 안팎에
 for (x, y, s) in [(-6.5, -4.5, 1.6), (-7.0, 3.5, 1.9), (6.8, 4.5, 1.7), (7.2, -3.8, 1.4), (-3.5, 6.0, 1.5), (4.0, 6.3, 1.8),
                   (-8.3, -0.5, 1.3), (8.4, 0.8, 1.5), (-5.5, -6.5, 1.2), (5.8, -6.4, 1.6)]:
-    cyl(gx, 'wood2', (x, y, 0.45 * s), 0.11 * s, 0.9 * s, seg=8)
-    sphere(gx, 'leaf', (x, y, 1.25 * s), 0.62 * s, seg=12, scale=(1, 1, 1.15))
-    sphere(gx, 'sage', (x + 0.25 * s, y - 0.2 * s, 1.5 * s), 0.38 * s, seg=10)
+    cyl(gx, 'bark', (x, y, 0.5 * s), 0.11 * s, 1.0 * s, r2=0.085 * s, seg=10)                         # 기둥: 나무껍질 사진, 위로 가늘게
+    for k, (bx, by, bz) in enumerate(((0.22, 0.1, 0.9), (-0.18, -0.2, 1.0), (0.05, 0.28, 1.1))):                 # 가지 셋
+        cyl(gx, 'bark', (x + bx * s * 0.5, y + by * s * 0.5, bz * s), 0.035 * s, 0.5 * s, rot=(by * 1.2, -bx * 1.2, 0), seg=6)
+    leaf_cards(gx, (x, y, 1.3 * s), 0.72 * s, int(170 * s), seed=int(x * 7 + y * 13), size=0.27 * math.sqrt(s), scale=(1, 1, 1.12))
+    leaf_cards(gx, (x + 0.28 * s, y - 0.22 * s, 1.58 * s), 0.42 * s, int(70 * s), seed=int(x * 11 + y * 5 + 1), size=0.24 * math.sqrt(s), scale=(1, 1, 1.0))
 # 현관 포치 지붕 (2026-11-24): 기둥 둘 + 바깥으로 기운 작은 지붕. building.js OBST[1] 의 기둥 자리와 같아야 한다
 PX0, PX1, PY = 0.1, 1.5, -D / 2 - 1.0
 for px in (PX0, PX1):
@@ -871,6 +903,8 @@ def bake_ao(objs):
     # 모든 메시를 세계 좌표의 한 BVH 로
     verts, polys = [], []
     for o in meshes:
+        if any(m and m.name == 'leafcard' for m in o.data.materials):   # 잎 카드는 가림막에서 뺀다 — 수관의 그늘은 속 공('leaf')이 만든다
+            continue
         base = len(verts)
         M = o.matrix_world
         verts.extend([M @ v.co for v in o.data.vertices])
@@ -885,7 +919,7 @@ def bake_ao(objs):
         dirs.append(Vector((r * math.cos(phi), r * math.sin(phi), math.sqrt(max(0.0, 1 - u)))))
     for o in meshes:
         me = o.data
-        glow = all(m.name.startswith('glow') for m in me.materials if m)
+        glow = all(m.name.startswith('glow') or m.name in ('leafcard', 'leaf') for m in me.materials if m)   # 잎 카드·속 공은 그늘을 재지 않는다(수관 속이라 전부 검게 나온다)
         col = me.color_attributes.new('ao', 'BYTE_COLOR', 'CORNER')   # 바이트면 glb 가 1/4
         me.color_attributes.active_color = col
         M = o.matrix_world
@@ -964,9 +998,22 @@ def texture_materials():
             nt.links.new(otex.outputs['Color'], sep.inputs['Color'])
             nt.links.new(sep.outputs['Green'], bsdf.inputs['Roughness'])
             nt.links.new(sep.outputs['Blue'], bsdf.inputs['Metallic'])
+    # 잎 카드: 잎 사진(RGBA) 색 + 알파 컷. Math ROUND 를 거친 알파는 glTF 로 alphaMode MASK(cutoff 0.5) 로 나간다. 양면.
+    m = MATS.get('leafcard')
+    lp = textures._find(ASSET_DIR, 'leafcard')
+    if m is not None and lp:
+        nt = m.node_tree; bsdf = nt.nodes.get('Principled BSDF')
+        tex = nt.nodes.new('ShaderNodeTexImage'); tex.image = _image(lp, 'leafcard')
+        nt.links.new(tex.outputs['Color'], bsdf.inputs['Base Color'])
+        rnd = nt.nodes.new('ShaderNodeMath'); rnd.operation = 'ROUND'
+        nt.links.new(tex.outputs['Alpha'], rnd.inputs[0]); nt.links.new(rnd.outputs[0], bsdf.inputs['Alpha'])
+        bsdf.inputs['Roughness'].default_value = 0.7
+        m.use_backface_culling = False
+        if hasattr(m, 'surface_render_method'):
+            m.surface_render_method = 'DITHERED'
     # 텍스처 없는 재질의 거칠기·금속성 (실사 PBR)
     for key, m in MATS.items():
-        if key in TEX:
+        if key in TEX or key == 'leafcard':
             continue
         bsdf = m.node_tree.nodes.get('Principled BSDF')
         rough, metal = ROUGH.get(key, (0.8, 0.0))
@@ -982,6 +1029,8 @@ def project_uvs(objs):
         if o.type != 'MESH':
             continue
         me = o.data
+        if me.uv_layers:                   # 잎 카드처럼 UV 를 직접 쓴 메시
+            continue
         uv = me.uv_layers.new(name='UVMap')
         M = o.matrix_world
         for p in me.polygons:
